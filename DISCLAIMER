@@ -1,0 +1,9 @@
+Building Block Disclaimer
+
+This module can be licensed under the Inmanta EULA.
+
+This module is an Inmanta internal tool, with no other purpose than assisting in the construction of specific other modules.
+This module provides no functionality of its own, has no implied warranties and has no fitness for any particular purpose.
+It requires specific training to use safely.
+
+No support is provided on this module except through Inmanta supported and licensed modules that use its functionality.

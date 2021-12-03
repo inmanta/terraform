@@ -1,0 +1,52 @@
+# Test configuration and values for checkpoint provider
+checkpoint:
+  configuration:  # This section can be shared
+    host: cp-smc-1.bics.inmanta.com
+    context: vsx-gw-1
+    username_env_var: CHECKPOINT_USER
+    password_env_var: CHECKPOINT_PASS
+  
+  values:  # This is taken from guillaume's lab
+    prefix: inmanta-ci-test
+    ip_range: 10.100.144.0/21
+
+# Test configuration and values for gitlab provider
+gitlab:
+  configuration:
+    base_url: https://code.inmanta.com/api/v4
+    token_env_var: GITLAB_TOKEN
+
+  values:
+    namespace_id: 117  # /tests/jenkins
+    namespace_path: tests/jenkins
+    project_name: example
+
+# Test configuration and values for github provider
+github:
+  configuration:
+    owner: inmanta-test
+    token_env_var: GITHUB_TOKEN
+
+  values:
+    repository_name: test-repository
+
+# Test configuration and values for fortios provider
+fortios:
+  configuration:
+    hostname: 192.168.21.11
+    token_env_var: FORTIOS_TOKEN
+
+  values:
+    prefix: ci
+    ip_range: 10.100.144.0/21
+    vlan_range:
+      from: 144  # Included
+      to: 152  # Not included
+    physical_interface: wan2
+    physical_switch:
+      id_env_var: FORTIOS_SWITCH_ID
+      ports:
+        - name: port5
+          mac_addr: e0:23:ff:de:f5:9e
+        - name: port6
+          mac_addr: e0:23:ff:de:f5:9f

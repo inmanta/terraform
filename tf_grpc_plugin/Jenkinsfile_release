@@ -1,0 +1,57 @@
+pipeline {
+  agent any
+  options {
+    disableConcurrentBuilds()
+  }
+  stages {
+    stage("setup"){
+      steps{
+        script{
+          sh """
+          cd tf_grpc_plugin/
+          python3 -m venv ${env.WORKSPACE}/env
+          ${env.WORKSPACE}/env/bin/pip install -U pip
+          ${env.WORKSPACE}/env/bin/pip install -r requirements.dev.txt
+          ${env.WORKSPACE}/env/bin/python3 setup.py install
+          """
+        }
+      }
+    }
+    stage("build") {
+      steps {
+        script {
+          sh """
+            cd tf_grpc_plugin/
+            ${env.WORKSPACE}/env/bin/python3 -m grpc_tools.protoc -I proto --python_out=src/ --grpc_python_out=src/ proto/tfplugin5/tfplugin5.proto
+          """
+        }
+      }
+    }
+    stage("release") {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'devpi-user', usernameVariable: 'DEVPI_USER', passwordVariable: 'DEVPI_PASS')]) {
+          sh'''
+            cd tf_grpc_plugin/
+
+            "/opt/devpi-client/venv/bin/devpi" use https://artifacts.internal.inmanta.com/inmanta/dev/
+
+            "/opt/devpi-client/venv/bin/devpi" login "${DEVPI_USER}" --password="${DEVPI_PASS}"
+
+            rm -f dist/*
+
+            "${WORKSPACE}/env/bin/python3" setup.py sdist
+
+            "/opt/devpi-client/venv/bin/devpi" upload dist/*
+
+            "/opt/devpi-client/venv/bin/devpi" logoff
+          '''
+        }
+      }
+    }
+  }
+  post {
+    always {
+      deleteDir()
+    }
+  }
+}

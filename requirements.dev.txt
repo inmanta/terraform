@@ -1,0 +1,5 @@
+inmanta-dev-dependencies[module,extension]==1.41.0
+pytest
+netaddr
+cpapi
+pytest-inmanta

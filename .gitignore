@@ -1,0 +1,4 @@
+.vscode/
+*.pyc
+trace.txt
+personal_env.sh
