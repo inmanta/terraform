@@ -5,14 +5,12 @@ pipeline {
     }
     options {
         disableConcurrentBuilds()
-        gitLabConnection('code.inmanta.com')
         timestamps()
         timeout(time: 120, unit: 'MINUTES')
     }
     stages {
         stage('setup') {
             steps {
-                updateGitlabCommitStatus name: 'build', state: 'pending'
                 script {
                     sh '''
                     python3 -m venv ${WORKSPACE}/env
@@ -75,12 +73,6 @@ pipeline {
         }
     }
     post {
-        failure {
-            updateGitlabCommitStatus name: 'build', state: 'failed'
-        }
-        success {
-            updateGitlabCommitStatus name: 'build', state: 'success'
-        }
         always {
             deleteDir()
         }
