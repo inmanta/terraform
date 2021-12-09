@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 - ?
+## 1.0.0 - 09/12/2021
 
  - Add alias attribute on Provider entity.  This alias is included in the index.  (#8)
 
