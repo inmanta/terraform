@@ -14,7 +14,7 @@ pipeline {
                 script {
                     sh '''
                     python3 -m venv ${WORKSPACE}/env
-                    . ${WORKSPACE}/env/activate
+                    . ${WORKSPACE}/env/bin/activate
                     make install
                     '''
                 }
@@ -24,7 +24,7 @@ pipeline {
             steps {
                 script {
                     sh'''
-                    . ${WORKSPACE}/env/activate
+                    . ${WORKSPACE}/env/bin/activate
                     make pep8
                     '''
                 }
