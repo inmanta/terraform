@@ -14,9 +14,8 @@ pipeline {
                 script {
                     sh '''
                     python3 -m venv ${WORKSPACE}/env
-                    "${WORKSPACE}"/env/bin/pip install -U pip ${PIP_OPTIONS}
-                    "${WORKSPACE}"/env/bin/pip install -r requirements.txt --pre -i https://artifacts.internal.inmanta.com/inmanta/dev
-                    "${WORKSPACE}"/env/bin/pip install -r requirements.dev.txt --pre -i https://artifacts.internal.inmanta.com/inmanta/dev
+                    . ${WORKSPACE}/env/activate
+                    make install
                     '''
                 }
             }
@@ -25,7 +24,8 @@ pipeline {
             steps {
                 script {
                     sh'''
-                    ${WORKSPACE}/env/bin/flake8 plugins tests
+                    . ${WORKSPACE}/env/activate
+                    make pep8
                     '''
                 }
             }

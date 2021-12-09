@@ -3,3 +3,6 @@ pytest
 netaddr
 cpapi
 pytest-inmanta
+types-protobuf
+types-requests
+grpcio-tools

@@ -20,7 +20,7 @@ format:
 pep8:
 	$(flake8)
 
-RUN_MYPY_PLUGINS=MYPYPATH=docs python -m mypy --html-report mypy/out/inmanta_plugins -p inmanta_plugins.terraform
+RUN_MYPY_PLUGINS=MYPYPATH=docs python -m mypy --html-report mypy/out/inmanta_plugins -p inmanta_plugins.terraform --exclude inmanta_plugins.terraform.tfplugin5.*
 RUN_MYPY_TESTS=MYPYPATH=tests python -m mypy --html-report mypy/out/tests tests
 
 mypy-plugins:
@@ -33,3 +33,6 @@ mypy-tests:
 
 .PHONY: mypy
 mypy: mypy-plugins mypy-tests
+
+tfplugin5:
+	cd docs/tf_grpc_plugin/ && python -m grpc_tools.protoc -I proto --python_out=.. --grpc_python_out=.. proto/inmanta_plugins/terraform/tfplugin5/tfplugin5.proto; cd ../..
