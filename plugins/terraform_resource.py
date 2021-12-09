@@ -64,7 +64,7 @@ class TerraformResource(PurgeableResource):
 
     @staticmethod
     def get_id(exporter, entity):
-        return f"{entity.provider.agent_config.agentname}-{entity.type}-{entity.name}-{entity.alias}"
+        return f"{entity.provider.agent_config.agentname}-{entity.provider.alias}-{entity.type}-{entity.name}"
 
     @staticmethod
     def get_agent_name(exporter, entity) -> str:

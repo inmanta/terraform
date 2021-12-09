@@ -19,11 +19,11 @@ from helpers.terraform_provider import TerraformProvider
 
 
 class LocalProvider(TerraformProvider):
-    def __init__(self) -> None:
+    def __init__(self, alias: str = "") -> None:
         """
         https://registry.terraform.io/providers/hashicorp/local/2.1.0/docs
         """
-        super().__init__("hashicorp", "local", "2.1.0")
+        super().__init__("hashicorp", "local", "2.1.0", alias)
 
     @property
     def config(self) -> dict:

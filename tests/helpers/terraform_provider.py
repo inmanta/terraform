@@ -21,10 +21,13 @@ from textwrap import dedent, indent
 
 
 class TerraformProvider:
-    def __init__(self, namespace: str, type: str, version: str) -> None:
+    def __init__(
+        self, namespace: str, type: str, version: str, alias: str = ""
+    ) -> None:
         self.namespace = namespace
         self.type = type
         self.version = version
+        self.alias = alias
 
     @property
     @abstractmethod
@@ -52,6 +55,7 @@ class TerraformProvider:
                 namespace="{self.namespace}",
                 type="{self.type}",
                 version="{self.version}",
+                alias="{self.alias}",
                 config={config},
                 auto_agent=false,
                 agent_config={var_name}_agent_config,
@@ -65,6 +69,7 @@ class TerraformProvider:
                 namespace="{self.namespace}",
                 type="{self.type}",
                 version="{self.version}",
+                alias="{self.alias}",
             ]
         """
         return dedent(model.strip("\n"))
