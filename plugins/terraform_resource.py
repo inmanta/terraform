@@ -54,6 +54,7 @@ class TerraformResource(PurgeableResource):
         "provider_namespace",
         "provider_type",
         "provider_version",
+        "provider_alias",
         "provider_config",
         "resource_type",
         "resource_name",
@@ -63,7 +64,7 @@ class TerraformResource(PurgeableResource):
 
     @staticmethod
     def get_id(exporter, entity):
-        return f"{entity.provider.agent_config.agentname}-{entity.type}-{entity.name}"
+        return f"{entity.provider.agent_config.agentname}-{entity.type}-{entity.name}-{entity.alias}"
 
     @staticmethod
     def get_agent_name(exporter, entity) -> str:
@@ -80,6 +81,10 @@ class TerraformResource(PurgeableResource):
     @staticmethod
     def get_provider_version(exporter, entity) -> str:
         return entity.provider.version
+
+    @staticmethod
+    def get_provider_alias(exporter, entity) -> str:
+        return entity.provider.alias
 
     @staticmethod
     def get_provider_config(exporter, entity) -> dict:
