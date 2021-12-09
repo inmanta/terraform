@@ -2,3 +2,5 @@
 *.pyc
 trace.txt
 personal_env.sh
+mypy
+.mypy_cache

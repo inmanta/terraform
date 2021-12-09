@@ -13,10 +13,10 @@ pipeline {
             steps {
                 script {
                     sh '''
+                    export PIP_INDEX_URL=https://artifacts.internal.inmanta.com/inmanta/dev
                     python3 -m venv ${WORKSPACE}/env
-                    "${WORKSPACE}"/env/bin/pip install -U pip ${PIP_OPTIONS}
-                    "${WORKSPACE}"/env/bin/pip install -r requirements.txt --pre -i https://artifacts.internal.inmanta.com/inmanta/dev
-                    "${WORKSPACE}"/env/bin/pip install -r requirements.dev.txt --pre -i https://artifacts.internal.inmanta.com/inmanta/dev
+                    . ${WORKSPACE}/env/bin/activate
+                    make install
                     '''
                 }
             }
@@ -25,7 +25,8 @@ pipeline {
             steps {
                 script {
                     sh'''
-                    ${WORKSPACE}/env/bin/flake8 plugins tests
+                    . ${WORKSPACE}/env/bin/activate
+                    make pep8
                     '''
                 }
             }
