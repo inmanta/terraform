@@ -13,6 +13,7 @@ pipeline {
             steps {
                 script {
                     sh '''
+                    export PIP_INDEX_URL=https://artifacts.internal.inmanta.com/inmanta/dev
                     python3 -m venv ${WORKSPACE}/env
                     . ${WORKSPACE}/env/bin/activate
                     make install
