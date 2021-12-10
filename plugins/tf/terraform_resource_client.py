@@ -388,12 +388,12 @@ class TerraformResourceClient:
 
         self.logger.debug(f"Create resource response: {str(result)}")
 
-        raise_for_diagnostics(result.diagnostics, "Failed to create the resource")
-
         self.resource_state.private = result.private
         self.resource_state.state = parse_response(
             msgpack.unpackb(result.new_state.msgpack)
         )
+
+        raise_for_diagnostics(result.diagnostics, "Failed to create the resource")
 
         return self.resource_state.state
 
@@ -459,12 +459,12 @@ class TerraformResourceClient:
 
         self.logger.debug(f"Update resource response: {str(result)}")
 
-        raise_for_diagnostics(result.diagnostics, "Failed to update the resource")
-
         self.resource_state.state = parse_response(
             msgpack.unpackb(result.new_state.msgpack)
         )
         self.resource_state.private = result.private
+
+        raise_for_diagnostics(result.diagnostics, "Failed to update the resource")
 
         return self.resource_state.state
 
