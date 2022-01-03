@@ -40,6 +40,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--lab",
         action="store",
+        default="ci",
         help="Name of the lab to use",
     )
 

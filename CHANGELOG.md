@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 03/01/2022
+
+ - Added ci as default lab when running pytest
+
 ## 1.0.1 - 10/12/2021
 
  - Fix bug where state was not saved if resource failed to create or update.  (#11)
