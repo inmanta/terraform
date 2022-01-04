@@ -2,7 +2,7 @@
 
 ## 1.0.2 - 03/01/2022
 
- - Added ci as default lab when running pytest
+ - Added `INMANTA_TERRAFORM_LAB` environment variable to control testing lab.
 
 ## 1.0.1 - 10/12/2021
 

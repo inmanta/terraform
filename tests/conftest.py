@@ -40,14 +40,14 @@ def pytest_addoption(parser):
     parser.addoption(
         "--lab",
         action="store",
-        default="ci",
-        help="Name of the lab to use",
+        help="Name of the lab to use. Overrides the value set in the INMANTA_TERRAFORM_LAB environment variable.",
     )
 
 
 @pytest.fixture(scope="session")
 def lab_name(request) -> str:
-    lab_name = request.config.getoption("--lab")
+    pytest_option: Optional[str] = request.config.getoption("--lab")
+    lab_name: Optional[str] = pytest_option if pytest_option is not None else os.environ.get("INMANTA_TERRAFORM_LAB", None)
 
     if lab_name is None:
         raise Exception("This test requires the --lab option to be set")
