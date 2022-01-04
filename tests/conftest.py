@@ -47,7 +47,11 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="session")
 def lab_name(request) -> str:
     pytest_option: Optional[str] = request.config.getoption("--lab")
-    lab_name: Optional[str] = pytest_option if pytest_option is not None else os.environ.get("INMANTA_TERRAFORM_LAB", None)
+    lab_name: Optional[str] = (
+        pytest_option
+        if pytest_option is not None
+        else os.environ.get("INMANTA_TERRAFORM_LAB", None)
+    )
 
     if lab_name is None:
         raise Exception("This test requires the --lab option to be set")
