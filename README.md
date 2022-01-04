@@ -227,6 +227,7 @@ export GITLAB_TOKEN=""  # A personal gitlab token, with read/write/delete access
 To speed up mutliple test executions, you can set a caching directory so that all the provider binaries don't need to be downloaded every time.  This is done using the `--cache-dir <path-to-folder>` argument.
 
 Finally, the test will need some input, coming from a lab file (in [`tests/labs`](tests/labs/)).  You can base yourself on one of the existing one to create your own.  Then add the `--lab <file-name-minus-.yaml>` argument.
+Alternatively, the lab can be picked through the `INMANTA_TERRAFORM_LAB` environment variable.
 
 You can then run the test like so:
 ```bash

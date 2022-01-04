@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 03/01/2022
+
+ - Added `INMANTA_TERRAFORM_LAB` environment variable to select testing lab.
+
 ## 1.0.1 - 10/12/2021
 
  - Fix bug where state was not saved if resource failed to create or update.  (#11)
