@@ -46,27 +46,27 @@ pipeline {
                                 // For Checkpoint provider tests
                                 usernamePassword(
                                     credentialsId: 'checkpoint_credentials',
-                                    usernameVariable: 'CHECKPOINT_USER',
-                                    passwordVariable: 'CHECKPOINT_PASS'
+                                    usernameVariable: 'TERRAFORM_CHECKPOINT_USER',
+                                    passwordVariable: 'TERRAFORM_CHECKPOINT_PASS'
                                 ),
                                 // For Fortios provider tests
                                 string(
                                     credentialsId: 'fortios_token',
-                                    variable: 'FORTIOS_TOKEN'
+                                    variable: 'TERRAFORM_FORTIOS_TOKEN'
                                 ),
                                 string(
                                     credentialsId: 'fortios_switch_id',
-                                    variable: 'FORTIOS_SWITCH_ID'
+                                    variable: 'TERRAFORM_FORTIOS_SWITCH_ID'
                                 ),
                                 // For GitHub provider tests
                                 string(
                                     credentialsId: 'jenkins_on_github',
-                                    variable: 'GITHUB_TOKEN'
+                                    variable: 'TERRAFORM_GITHUB_TOKEN'
                                 ),
                                 // For Gitlab provider tests
                                 string(
                                     credentialsId: 'jenkins_on_gitlab',
-                                    variable: 'GITLAB_TOKEN'
+                                    variable: 'TERRAFORM_GITLAB_TOKEN'
                                 )
                             ]) {
                                 sh'''
