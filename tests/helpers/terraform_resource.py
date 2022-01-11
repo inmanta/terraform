@@ -112,8 +112,31 @@ class TerraformResource:
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Iterable[model.ResourceAction]:
-        before = before or datetime.datetime.now().astimezone()
-        after = after or datetime.datetime.fromtimestamp(0).astimezone()
+        """
+        Get all the resource actions of the specified resource.  Those resource actions
+        will be before :param before: and after :param after:.  If :param oldest_first: is True,
+        the actions are visited starting from the oldest ones, otherwise it is the opposite.
+
+        :param client: A client that can be used to query actions
+        :param environment: The environment from which the actions should be queried
+        :param oldest_first: True to get the oldest visit the oldest actions first, False for the newest ones first
+        :param action_filter: A callable that will see all queried action and filter them
+        :param after: A datetime, timezone-aware, which should be the starting point of our research (or end).
+        :param before: A datetime, timezone-aware, which should be the end of our research (or start).
+        """
+        # All created datetimes are offset-aware and in utc
+        # We expect any value passed in the parameter to be as well
+        before = before or datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
+        if not is_offset_aware(before):
+            raise ValueError(
+                f"The provided value should be timezone-aware but isn't: before={before}"
+            )
+
+        after = after or datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
+        if not is_offset_aware(after):
+            raise ValueError(
+                f"The provided value should be timezone-aware but isn't: after={after}"
+            )
 
         while before > after:
             kwargs = dict(
@@ -129,9 +152,17 @@ class TerraformResource:
             kwargs = dict(filter(lambda item: item[1] is not None, kwargs.items()))
 
             if not oldest_first:
-                kwargs["last_timestamp"] = before
+                # We force the date we send to be offset-naive, to stay compatible with ISO3
+                # It will also be compatible with ISO4+ as the datetime is UTC
+                kwargs["last_timestamp"] = before.astimezone(
+                    tz=datetime.timezone.utc
+                ).replace(tzinfo=None)
             else:
-                kwargs["first_timestamp"] = after
+                # We force the date we send to be offset-naive, to stay compatible with ISO3
+                # It will also be compatible with ISO4+ as the datetime is UTC
+                kwargs["first_timestamp"] = after.astimezone(
+                    tz=datetime.timezone.utc
+                ).replace(tzinfo=None)
 
             response: Result = await client.get_resource_actions(**kwargs)
             if response.code != 200:
@@ -145,35 +176,32 @@ class TerraformResource:
                 for action in response.result.get("data", [])
             ]
 
-            if oldest_first:
-                actions.reverse()
+            if not actions:
+                # We reached the end, the server doesn't have any more action to give us
+                return
 
-            for action in actions:
+            for action in sorted(
+                actions, key=lambda action: action.started, reverse=not oldest_first
+            ):
                 if not is_offset_aware(action.started):
                     # Depending on the version of the core, the returned date might not be offset-aware
                     # if it is not, the date is a utc one.  We then make it aware of its timezone.
-                    LOGGER.debug("Converting action date to be offset aware")
                     action.started = action.started.replace(
                         tzinfo=datetime.timezone.utc
                     )
 
-                if not oldest_first and action.started < after:
-                    # We get fixed size pages so this might happen when we reach the end
-                    break
+                if not oldest_first:
+                    before = action.started
+                else:
+                    after = action.started
 
-                if oldest_first and action.started > before:
-                    # We get fixed size pages so this might happen when we reach the end
-                    break
+                if before <= after:
+                    # We need to check this here as well or me might accept an action that
+                    # is out of the bounds
+                    return
 
                 if action_filter is None or action_filter(action):
                     yield action
-
-            if len(actions) == 0:
-                before = after
-            elif not oldest_first:
-                before = actions[-1].started
-            else:
-                after = actions[-1].started
 
     async def get_last_action(
         self,
