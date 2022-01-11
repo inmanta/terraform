@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.4 - 11/01/2022
+- Fixed time-zone awareness issues in test cases (#17)
+
 ## 1.0.3 - 10/01/2022
 - Renamed test lab config's environment variables (inmanta/infra-tickets#151)
 
