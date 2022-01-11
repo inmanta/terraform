@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3 - 10/01/2022
+- Renamed test lab config's environment variables (inmanta/infra-tickets#151)
+
 ## 1.0.2 - 03/01/2022
 
  - Added `INMANTA_TERRAFORM_LAB` environment variable to select testing lab.

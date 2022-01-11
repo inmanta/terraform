@@ -3,9 +3,9 @@ checkpoint:
   configuration:  # This section can be shared
     host: cp-smc-1.bics.inmanta.com
     context: vsx-gw-1
-    username_env_var: CHECKPOINT_USER
-    password_env_var: CHECKPOINT_PASS
-  
+    username_env_var: TERRAFORM_CHECKPOINT_USER
+    password_env_var: TERRAFORM_CHECKPOINT_PASS
+
   values:  # This is personal
     prefix: inmanta-gu-test
     ip_range: 10.100.152.0/21
@@ -14,7 +14,7 @@ checkpoint:
 gitlab:
   configuration:
     base_url: https://code.inmanta.com/api/v4
-    token_env_var: GITLAB_TOKEN
+    token_env_var: TERRAFORM_GITLAB_TOKEN
 
   values:
     namespace_id: 116  # /tests/guillaume
@@ -25,7 +25,7 @@ gitlab:
 github:
   configuration:
     owner: edvgui
-    token_env_var: GITHUB_TOKEN
+    token_env_var: TERRAFORM_GITHUB_TOKEN
 
   values:
     repository_name: test-repository
@@ -34,7 +34,7 @@ github:
 fortios:
   configuration:
     hostname: 192.168.21.11
-    token_env_var: FORTIOS_TOKEN
+    token_env_var: TERRAFORM_FORTIOS_TOKEN
 
   values:
     prefix: gu
@@ -44,7 +44,7 @@ fortios:
       to: 160  # Not included
     physical_interface: wan2
     physical_switch:
-      id_env_var: FORTIOS_SWITCH_ID
+      id_env_var: TERRAFORM_FORTIOS_SWITCH_ID
       ports:
         - name: port7
           mac_addr: e0:23:ff:de:f5:a0
