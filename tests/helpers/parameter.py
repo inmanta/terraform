@@ -1,79 +1,58 @@
 """
-    :copyright: 2021 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
-"""
+    Copyright 2022 Inmanta
 
-from abc import abstractclassmethod
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Contact: code@inmanta.com
+"""
 import os
-from typing import Any, Generic, List, Optional, TypeVar
+from abc import abstractclassmethod
+from typing import Generic, Optional, TypeVar
 
 from _pytest.config import Config
-from _pytest.config.argparsing import Parser
-from pydantic import BaseModel
+
+ParameterType = TypeVar("ParameterType", bound=object)
 
 
-all_parameters: List["TestParameter"] = []
-"""
-This list will holds all test parameters, as they will add themself here on creation
-"""
+class ParameterNotSetException(ValueError):
+    pass
 
 
-def pytest_addoption(parser: Parser) -> None:
-    """
-    Setting up all test parameters in one go
-    """
-    group = parser.getgroup(
-        "terraform", description="Terraform module testing options"
-    )
-    for param in all_parameters:
-        group.addoption(
-            param.argument,
-            action=param.action,
-            help=param.help,
-            dest=param.key,
-        )
-
-
-ParameterType = TypeVar("ParameterType", object)
-
-
-class TestParameter(Generic[ParameterType], BaseModel):
+class TestParameter(Generic[ParameterType]):
     """
     This class represents a parameter that can be passed to the tests, either via a pytest
     argument, or via an environment variable.
     """
 
-    argument: str
-    """
-    This is the argument that can be passed to the pytest command.
-    """
-
-    environment_variable: str
-    """
-    This is the name of the environment variable in which the value can be stored.
-    """
-
-    usage: str
-    """
-    This is a small description of what the parameter value will be used for.
-    """
-
-    key: str
-    """
-    This is a unique value, used to identify the parameter.
-    """
-
-    default: Optional[ParameterType] = None
-    """
-    This is the default value to provide if the parameter is resolved but hasn't been set.
-    """
-
-    def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
-
-        # Registering this test parameter, this will then be automatically added to pytest options
-        all_parameters.append(__pydantic_self__)
+    def __init__(
+        self,
+        argument: str,
+        environment_variable: str,
+        usage: str,
+        default: Optional[ParameterType] = None,
+    ) -> None:
+        """
+        :param argument: This is the argument that can be passed to the pytest command.
+        :param environment_variable: This is the name of the environment variable in which
+            the value can be stored.
+        :param usage: This is a small description of what the parameter value will be used for.
+        :param default: This is the default value to provide if the parameter is resolved but
+            hasn't been set.
+        """
+        self.argument = argument
+        self.environment_variable = environment_variable
+        self.usage = usage
+        self.default = default
 
     @property
     def help(self) -> str:
@@ -110,9 +89,9 @@ class TestParameter(Generic[ParameterType], BaseModel):
         First, we try to get it from the provided options.
         Second, we try to get it from environment variables.
         Then, if there is a default, we use it.
-        Finally, if none of the above worked, we raise an Exception.
+        Finally, if none of the above worked, we raise a ParameterNotSetException.
         """
-        option = config.getoption(self.key, default=None)
+        option = config.getoption(self.argument, default=None)
         if option is not None:
             return self.validate(str(option))
 
@@ -123,8 +102,8 @@ class TestParameter(Generic[ParameterType], BaseModel):
         if self.default is not None:
             return self.default
 
-        raise Exception(
-            f"Couldn't resolve a test parameter: {self.key}.  "
+        raise ParameterNotSetException(
+            f"Couldn't resolve a test parameter.  "
             f"You can set it using {self.argument} argument or "
             f"{self.environment_variable} environment variable."
         )
@@ -155,13 +134,16 @@ class BooleanTestParameter(TestParameter[bool]):
     A test parameter that should contain a boolean value
     """
 
-    default = False
-    """
-    If the value is not set, the value is False
-    """
+    def __init__(
+        self, argument: str, environment_variable: str, usage: str, default=False
+    ) -> None:
+        super().__init__(argument, environment_variable, usage, default)
 
     @property
     def action(self) -> str:
+        if self.default is True:
+            return "store_false"
+
         return "store_true"
 
     @classmethod
