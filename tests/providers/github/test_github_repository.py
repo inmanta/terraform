@@ -39,6 +39,7 @@ def repository_is_deployed(client: GithubClient, repository_name: str) -> bool:
 
 
 @pytest.mark.asyncio
+@pytest.mark.terraform_provider_github
 async def test_crud(
     project: Project,
     server: Server,

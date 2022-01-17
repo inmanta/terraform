@@ -89,9 +89,10 @@ def pytest_configure(config: Config) -> None:
     Registering markers
     """
     for provider_parameter in provider_parameters:
+        name = provider_parameter.argument.strip("--").replace("-", "_")
         config.addinivalue_line(
             "markers",
-            f"{provider_parameter.argument.strip('--')}: mark test to run only with option {provider_parameter.argument}",
+            f"{name}: mark test to run only with option {provider_parameter.argument}",
         )
 
 
@@ -100,7 +101,7 @@ def pytest_runtest_setup(item: Item) -> None:
     Checking if a provider test should be skipped or not
     """
     for provider_parameter in provider_parameters:
-        name = provider_parameter.argument.strip("--")
+        name = provider_parameter.argument.strip("--").replace("-", "_")
         if name not in item.keywords:
             # The test is not marked
             continue
@@ -108,7 +109,7 @@ def pytest_runtest_setup(item: Item) -> None:
         if provider_parameter.resolve(item.config):
             # The test can be executed
             continue
-
+    
         pytest.skip(
             f"This test is only executed with option {provider_parameter.argument}"
         )
