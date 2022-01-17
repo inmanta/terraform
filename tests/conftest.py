@@ -109,7 +109,7 @@ def pytest_runtest_setup(item: Item) -> None:
         if provider_parameter.resolve(item.config):
             # The test can be executed
             continue
-    
+
         pytest.skip(
             f"This test is only executed with option {provider_parameter.argument}"
         )
