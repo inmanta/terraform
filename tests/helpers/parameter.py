@@ -91,12 +91,14 @@ class TestParameter(Generic[ParameterType]):
         Then, if there is a default, we use it.
         Finally, if none of the above worked, we raise a ParameterNotSetException.
         """
-        option = config.getoption(self.argument, default=None)
-        if option is not None:
+        option = config.getoption(self.argument, default=self.default)
+        if option is not None and option is not self.default:
+            # A value is set, and it is not the default one
             return self.validate(str(option))
 
         env_var = os.getenv(self.environment_variable)
         if env_var is not None:
+            # A value is set
             return self.validate(env_var)
 
         if self.default is not None:
