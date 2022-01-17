@@ -216,17 +216,20 @@ export INMANTA_MODULE_REPO=git@github.com:inmanta/
 
 2. Run tests
 
-The tests need two environment variables to be set in order to run properly:
+The tests need some environment variables to be set in order to run properly:
 ```bash
-export GITHUB_TOKEN=""  # A personal github token, with read/write/delete access to your organization (can be your own user) repositories.
-export GITLAB_TOKEN=""  # A personal gitlab token, with read/write/delete access to your group (can be your own user) projects.
+export TERRAFORM_GITHUB_TOKEN=""  # A personal github token, with read/write/delete access to your organization (can be your own user) repositories.
+export TERRAFORM_GITLAB_TOKEN=""  # A personal gitlab token, with read/write/delete access to your group (can be your own user) projects.
+export TERRAFORM_CHECKPOINT_USER=""  # A username to authenticate to the checkpoint instance
+export TERRAFORM_CHECKPOINT_PASS=""  # A password to authenticate to the checkpoint instance
+export TERRAFORM_FORTIOS_TOKEN=""  # A token to authenticate to fortios
+export TERRAFORM_FORTIOS_SWITCH_ID=""  # The id of the switch you will use in your tests
 ```
+> :warning: Once you have created your own lab file, you can change the name of those environment variables, they might not exactly correspond to what is shown above.
 
-> :bulb: Tips: add those lines in a `personal_env.sh` file at the root of this project.  It will be loaded automatically when your run `source env.sh`.
+To speed up multiple test executions, you can set a caching directory so that all the provider binaries don't need to be downloaded every time.  This is done using the `--terraform-cache-dir <path-to-folder>` argument.
 
-To speed up mutliple test executions, you can set a caching directory so that all the provider binaries don't need to be downloaded every time.  This is done using the `--cache-dir <path-to-folder>` argument.
-
-Finally, the test will need some input, coming from a lab file (in [`tests/labs`](tests/labs/)).  You can base yourself on one of the existing one to create your own.  Then add the `--lab <file-name-minus-.yaml>` argument.
+Finally, the test will need some input, coming from a lab file (in [`tests/labs`](tests/labs/)).  You can base yourself on one of the existing one to create your own.  Then add the `--terraform-lab <file-name-minus-.yaml>` argument.
 Alternatively, the lab can be picked through the `INMANTA_TERRAFORM_LAB` environment variable.
 
 You can then run the test like so:
