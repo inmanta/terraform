@@ -41,8 +41,8 @@ def inmanta_reset_state() -> None:
 
 
 def resource_attribute_reference(
-    resource: "terraform::Resource",
-    attribute_path: "any",
+    resource: "terraform::Resource",  # type: ignore
+    attribute_path: "any",  # type: ignore
 ) -> AttributeReference:
     resource_id = inmanta.resources.to_id(resource)
     if resource_id is None:
@@ -80,9 +80,9 @@ def resource_attribute_reference(
 @plugin
 def get_resource_attribute(
     context: Context,
-    resource: "terraform::Resource",
-    attribute_path: "any",
-) -> "any":
+    resource: "terraform::Resource",  # type: ignore
+    attribute_path: "any",  # type: ignore
+) -> "any":  # type: ignore
     """
     Get a resource attribute from the saved parameters (facts).
     :param resource: The resource we which to get an attribute from.
@@ -132,8 +132,8 @@ def get_resource_attribute(
 
 @plugin
 def get_resource_attribute_ref(
-    resource: "terraform::Resource",
-    attribute_path: "any",
+    resource: "terraform::Resource",  # type: ignore
+    attribute_path: "any",  # type: ignore
 ) -> "dict":
     """
     Get a resource attribute reference.  The difference with get_resource_attribute is that

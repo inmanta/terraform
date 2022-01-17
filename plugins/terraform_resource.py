@@ -270,7 +270,7 @@ class TerraformResourceHandler(CRUDHandler):
         Path(self.log_file_path).unlink()
 
     def read_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
+        self, ctx: HandlerContext, resource: TerraformResource
     ) -> None:
         """
         During the read phase, we need to:
@@ -301,7 +301,7 @@ class TerraformResourceHandler(CRUDHandler):
         }
 
     def create_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
+        self, ctx: HandlerContext, resource: TerraformResource
     ) -> None:
         """
         During the create phase, we need to:
@@ -329,7 +329,7 @@ class TerraformResourceHandler(CRUDHandler):
         ctx.set_created()
 
     def update_resource(
-        self, ctx: HandlerContext, changes: dict, resource: resources.PurgeableResource
+        self, ctx: HandlerContext, changes: dict, resource: TerraformResource
     ) -> None:
         """
         During the update phase, we need to:
@@ -357,7 +357,7 @@ class TerraformResourceHandler(CRUDHandler):
         ctx.set_updated()
 
     def delete_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
+        self, ctx: HandlerContext, resource: TerraformResource
     ) -> None:
         """
         During the delete phase, we need to:
