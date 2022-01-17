@@ -150,4 +150,4 @@ class BooleanTestParameter(TestParameter[bool]):
 
     @classmethod
     def validate(cls, raw_value: str) -> bool:
-        return raw_value.lower() != "false"
+        return raw_value.lower().strip() != "false"

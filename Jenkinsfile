@@ -76,7 +76,7 @@ pipeline {
                                 export INMANTA_TERRAFORM_PROVIDER_GITLAB="ya"
                                 export INMANTA_TERRAFORM_PROVIDER_LOCAL="da"
                                 ${WORKSPACE}/env/bin/pytest tests \
-                                    --lab ci \
+                                    --terraform-lab ci \
                                     --log-cli-level=DEBUG \
                                     -v -s \
                                     --junitxml=junit.xml
