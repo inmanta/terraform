@@ -79,7 +79,7 @@ class TestParameter(Generic[ParameterType]):
         """
         This method is called when any value is received from parameters or
         env variables.  It is given in the raw_value argument a string conversion
-        of tge received value.  It is up to the class extending this one to convert
+        of the received value.  It is up to the class extending this one to convert
         it to whatever value it wants.
         """
 
