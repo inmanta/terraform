@@ -70,11 +70,11 @@ pipeline {
                                 )
                             ]) {
                                 sh'''
-                                export INMANTA_TERRAFORM_PROVIDER_CHECKPOINT="false"  # This one is skipped
-                                export INMANTA_TERRAFORM_PROVIDER_FORTIOS="true"
-                                export INMANTA_TERRAFORM_PROVIDER_GITHUB="ok"
-                                export INMANTA_TERRAFORM_PROVIDER_GITLAB="ya"
-                                export INMANTA_TERRAFORM_PROVIDER_LOCAL="da"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_CHECKPOINT="true"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_FORTIOS="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_GITHUB="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_GITLAB="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_LOCAL="false"
                                 ${WORKSPACE}/env/bin/pytest tests \
                                     --terraform-lab ci \
                                     --log-cli-level=DEBUG \

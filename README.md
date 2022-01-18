@@ -262,7 +262,10 @@ Terraform module testing options:
                         Skip tests using the local provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_LOCAL, defaults to False)
 ...
 ```
-All the options can also be set using environment variables, as mentioned in the above documentation.  For *flag* options (options whose value is either `true`, if it is set, or `false` if it is not set), the only way to have the environment variable to evaluate as false, is to have it set to a string, which, once converted to lower case and striped, is equals to "`false`".
+All the options can also be set using environment variables, as mentioned in the above documentation.  For *flag* options (options whose value is either `true`, if it is set, or `false` if it is not set), the value will be converted to lower case and striped, it will be then evaluated like this:
+ - `value == "true"`: The flag value is True
+ - `value == "false"`: The flag value is False
+ - Anything else: Raise a ValueError
 
 4. Provider specific tests
 

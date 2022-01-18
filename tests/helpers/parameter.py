@@ -150,4 +150,11 @@ class BooleanTestParameter(TestParameter[bool]):
 
     @classmethod
     def validate(cls, raw_value: str) -> bool:
-        return raw_value.lower().strip() != "false"
+        parsed = raw_value.lower().strip()
+        if parsed == "false":
+            return False
+
+        if parsed == "true":
+            return True
+
+        raise ValueError("Boolean env var should be set to either 'true' or 'false'")
