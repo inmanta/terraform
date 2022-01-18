@@ -89,7 +89,11 @@ def pytest_configure(config: Config) -> None:
     Registering markers
     """
     for provider_parameter in provider_parameters:
-        name = provider_parameter.argument.strip("--").replace("-", "_").replace("_skip", "")
+        name = (
+            provider_parameter.argument.strip("--")
+            .replace("-", "_")
+            .replace("_skip", "")
+        )
         config.addinivalue_line(
             "markers",
             f"{name}: mark test to run only with option {provider_parameter.argument} is not set",
@@ -101,7 +105,11 @@ def pytest_runtest_setup(item: Item) -> None:
     Checking if a provider test should be skipped or not
     """
     for provider_parameter in provider_parameters:
-        name = provider_parameter.argument.strip("--").replace("-", "_").replace("_skip", "")
+        name = (
+            provider_parameter.argument.strip("--")
+            .replace("-", "_")
+            .replace("_skip", "")
+        )
         if name not in item.keywords:
             # The test is not marked
             continue
