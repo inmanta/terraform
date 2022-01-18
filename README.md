@@ -241,7 +241,7 @@ pytest tests --terraform-lab guillaume --terraform-cache-dir /tmp/your-cache-dir
 3. Test options
 
 The test are configurable through several means, one of them is pytest options.  You can use them to set the lab to use, a cache folder to use or to select which tests to run.  
-By default, only a few test will run.  If you need/want to run more, you have to select them, specifying the provider they are soliciting.  The options that can be used for this are the following:
+By default, all tests will run.  If you need/want to skip some, you have to unselect them, specifying the provider they are soliciting.  The options that can be used for this are the following:
 ```console
 $ pytest --help
 ...
@@ -250,16 +250,16 @@ Terraform module testing options:
                         Set fixed cache directory (overrides INMANTA_TERRAFORM_CACHE_DIR)
   --terraform-lab=TERRAFORM_LAB
                         Name of the lab to use (overrides INMANTA_TERRAFORM_LAB)
-  --terraform-provider-checkpoint
-                        Run tests using the checkpoint provider (overrides INMANTA_TERRAFORM_PROVIDER_CHECKPOINT, defaults to False)
-  --terraform-provider-fortios
-                        Run tests using the fortios provider (overrides INMANTA_TERRAFORM_PROVIDER_FORTIOS, defaults to False)
-  --terraform-provider-github
-                        Run tests using the github provider (overrides INMANTA_TERRAFORM_PROVIDER_GITHUB, defaults to False)
-  --terraform-provider-gitlab
-                        Run tests using the gitlab provider (overrides INMANTA_TERRAFORM_PROVIDER_GITLAB, defaults to False)
-  --terraform-provider-local
-                        Run tests using the local provider (overrides INMANTA_TERRAFORM_PROVIDER_LOCAL, defaults to False)
+  --terraform-skip-provider-checkpoint
+                        Skip tests using the checkpoint provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_CHECKPOINT, defaults to False)
+  --terraform-skip-provider-fortios
+                        Skip tests using the fortios provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_FORTIOS, defaults to False)
+  --terraform-skip-provider-github
+                        Skip tests using the github provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_GITHUB, defaults to False)
+  --terraform-skip-provider-gitlab
+                        Skip tests using the gitlab provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_GITLAB, defaults to False)
+  --terraform-skip-provider-local
+                        Skip tests using the local provider (overrides INMANTA_TERRAFORM_SKIP_PROVIDER_LOCAL, defaults to False)
 ...
 ```
 All the options can also be set using environment variables, as mentioned in the above documentation.  For *flag* options (options whose value is either `true`, if it is set, or `false` if it is not set), the only way to have the environment variable to evaluate as false, is to have it set to a string, which, once converted to lower case and striped, is equals to "`false`".

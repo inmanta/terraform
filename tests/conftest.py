@@ -55,9 +55,9 @@ lab = StringTestParameter(
 
 provider_parameters = [
     BooleanTestParameter(
-        argument=f"--terraform-provider-{provider}",
-        environment_variable=f"INMANTA_TERRAFORM_PROVIDER_{provider.upper()}",
-        usage=f"Run tests using the {provider} provider",
+        argument=f"--terraform-skip-provider-{provider}",
+        environment_variable=f"INMANTA_TERRAFORM_SKIP_PROVIDER_{provider.upper()}",
+        usage=f"Skip tests using the {provider} provider",
     )
     for provider in (
         "checkpoint",
@@ -89,10 +89,10 @@ def pytest_configure(config: Config) -> None:
     Registering markers
     """
     for provider_parameter in provider_parameters:
-        name = provider_parameter.argument.strip("--").replace("-", "_")
+        name = provider_parameter.argument.strip("--").replace("-", "_").replace("_skip", "")
         config.addinivalue_line(
             "markers",
-            f"{name}: mark test to run only with option {provider_parameter.argument}",
+            f"{name}: mark test to run only with option {provider_parameter.argument} is not set",
         )
 
 
@@ -101,18 +101,16 @@ def pytest_runtest_setup(item: Item) -> None:
     Checking if a provider test should be skipped or not
     """
     for provider_parameter in provider_parameters:
-        name = provider_parameter.argument.strip("--").replace("-", "_")
+        name = provider_parameter.argument.strip("--").replace("-", "_").replace("_skip", "")
         if name not in item.keywords:
             # The test is not marked
             continue
 
         if provider_parameter.resolve(item.config):
-            # The test can be executed
-            continue
-
-        pytest.skip(
-            f"This test is only executed with option {provider_parameter.argument}"
-        )
+            # The test should be skipped
+            pytest.skip(
+                f"This test is only executed with option {provider_parameter.argument}"
+            )
 
 
 @pytest.fixture(scope="session")
