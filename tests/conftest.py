@@ -92,7 +92,7 @@ def pytest_configure(config: Config) -> None:
         name = (
             provider_parameter.argument.strip("--")
             .replace("-", "_")
-            .replace("_skip", "")
+            .replace("_skip_", "_")
         )
         config.addinivalue_line(
             "markers",
@@ -108,7 +108,7 @@ def pytest_runtest_setup(item: Item) -> None:
         name = (
             provider_parameter.argument.strip("--")
             .replace("-", "_")
-            .replace("_skip", "")
+            .replace("_skip_", "_")
         )
         if name not in item.keywords:
             # The test is not marked
