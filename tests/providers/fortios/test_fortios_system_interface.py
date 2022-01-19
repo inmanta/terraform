@@ -46,6 +46,7 @@ def system_interface_is_deployed(
 
 
 @pytest.mark.asyncio
+@pytest.mark.terraform_provider_fortios
 async def test_crud(
     project: Project,
     server: Server,

@@ -70,8 +70,13 @@ pipeline {
                                 )
                             ]) {
                                 sh'''
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_CHECKPOINT="true"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_FORTIOS="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_GITHUB="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_GITLAB="false"
+                                export INMANTA_TERRAFORM_SKIP_PROVIDER_LOCAL="false"
                                 ${WORKSPACE}/env/bin/pytest tests \
-                                    --lab ci \
+                                    --terraform-lab ci \
                                     --log-cli-level=DEBUG \
                                     -v -s \
                                     --junitxml=junit.xml
