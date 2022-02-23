@@ -1,4 +1,3 @@
--e inmanta-tfplugin5
 msgpack
 protobuf
 grpcio
