@@ -1,3 +1,0 @@
-[pytest11]
-inmanta-tfplugin5 = tfplugin5
-

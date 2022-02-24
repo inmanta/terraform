@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 setup(
     # Package info
     name="inmanta-tfplugin5",
-    version="1.0.0",
+    version="0.0.1",
     author="Inmanta",
     author_email="code@inmanta.com",
     url="https://github.com/inmanta/terraform",
