@@ -85,6 +85,34 @@ pipeline {
                         }
                     }
                 }
+                stage('Publish inmanta-tfplugin5') {
+                    when {
+                        expression { return BRANCH_NAME == 'master' }
+                    }
+                    steps {
+                        withCredentials([
+                        usernamePassword(
+                            credentialsId: 'devpi-user',
+                            passwordVariable: 'DEVPI_PASS',
+                            usernameVariable: 'DEVPI_USER'
+                        )
+                        ]) {
+                        sh '''
+                            ${WORKSPACE}/env/bin/pip3 install -U devpi-client
+                            ${WORKSPACE}/env/bin/devpi use https://artifacts.internal.inmanta.com/inmanta/dev
+                            ${WORKSPACE}/env/bin/devpi login ${DEVPI_USER} --password=${DEVPI_PASS}
+
+                            cd inmanta-tfplugin5
+                            rm -f dist/*
+
+                            "${WORKSPACE}/env/bin/python3" setup.py egg_info -Db ".dev$(date +'%Y%m%d%H%M%S' --utc)" sdist
+
+                            ${WORKSPACE}/env/bin/devpi upload dist/*
+                            ${WORKSPACE}/env/bin/devpi logoff
+                            '''
+                        }
+                    }
+                }
             }
             post {
                 always {
