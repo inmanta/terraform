@@ -24,9 +24,9 @@ import threading
 from typing import IO, Any, List, Optional
 
 import grpc
+import inmanta_tfplugin.tfplugin5_pb2 as tfplugin5_pb2  # type: ignore
+import inmanta_tfplugin.tfplugin5_pb2_grpc as tfplugin5_pb2_grpc  # type: ignore
 import msgpack
-import tfplugin5.tfplugin5_pb2 as tfplugin5_pb2  # type: ignore
-import tfplugin5.tfplugin5_pb2_grpc as tfplugin5_pb2_grpc  # type: ignore
 from inmanta_plugins.terraform.helpers.utils import fill_partial_state
 from inmanta_plugins.terraform.tf.data import Diagnostic
 from inmanta_plugins.terraform.tf.exceptions import (
