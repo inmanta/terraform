@@ -26,6 +26,20 @@ from typing import IO, Any, List, Optional
 import grpc
 import inmanta_tfplugin.tfplugin5_pb2 as tfplugin5_pb2  # type: ignore
 import inmanta_tfplugin.tfplugin5_pb2_grpc as tfplugin5_pb2_grpc  # type: ignore
+
+"""
+The two import statements above SHOULD NOT BE REMOVED without proper consideration.
+Because of a design choice of the protobuf library, we can not simply copy the generated code
+in this module's plugins (as the inmanta agent will rename them):
+
+    https://github.com/protocolbuffers/protobuf/issues/9535
+
+Also note that this limitation can not be discovered by simply running this module's test suite
+as pytest-inmanta doesn't run a real agent.
+Changing those imports and having a successfull test run IS NOT ENOUGH to assume the module
+will work.
+"""
+
 import msgpack
 from inmanta_plugins.terraform.helpers.utils import fill_partial_state
 from inmanta_plugins.terraform.tf.data import Diagnostic
