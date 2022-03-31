@@ -1,7 +1,6 @@
 pipeline_template: ci/modules/Jenkinsfile-integration-tests
 lock: terraform-module-ci-lab
 env_vars:
-    INMANTA_LSM_USER: rocky
     INMANTA_TERRAFORM_LAB: ci
     INMANTA_TERRAFORM_SKIP_PROVIDER_CHECKPOINT: "true"
     INMANTA_TERRAFORM_SKIP_PROVIDER_FORTIOS: "false"
