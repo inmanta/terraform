@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import logging
+import time
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
@@ -39,6 +40,7 @@ def repository_is_deployed(client: GithubClient, repository_name: str) -> bool:
 
 
 @pytest.mark.asyncio
+@pytest.mark.terraform_provider_github
 async def test_crud(
     project: Project,
     server: Server,
@@ -117,4 +119,9 @@ async def test_crud(
     )
     assert last_action.change == Change.purged
 
-    assert not repository_is_deployed(github_client, repository_name)
+    for _ in range(5):
+        time.sleep(1)
+        if not repository_is_deployed(github_client, repository_name):
+            break
+    else:
+        assert False, "Repository should be deleted by now"

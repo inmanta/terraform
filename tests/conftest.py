@@ -25,38 +25,105 @@ from uuid import UUID
 
 import pytest
 import yaml
+from _pytest.config import Config
+from _pytest.config.argparsing import Parser
+from _pytest.nodes import Item
+from helpers.parameter import (
+    BooleanTestParameter,
+    ParameterNotSetException,
+    StringTestParameter,
+    TestParameter,
+)
 
 from inmanta.agent import config as inmanta_config
 from inmanta.agent.agent import Agent
 
 LOGGER = logging.getLogger(__name__)
 
+# Setting up global test parameters
+cache_dir = StringTestParameter(
+    argument="--terraform-cache-dir",
+    environment_variable="INMANTA_TERRAFORM_CACHE_DIR",
+    usage="Set fixed cache directory",
+)
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--cache-dir",
-        help="Set fixed cache directory",
+lab = StringTestParameter(
+    argument="--terraform-lab",
+    environment_variable="INMANTA_TERRAFORM_LAB",
+    usage="Name of the lab to use",
+)
+
+provider_parameters = [
+    BooleanTestParameter(
+        argument=f"--terraform-skip-provider-{provider}",
+        environment_variable=f"INMANTA_TERRAFORM_SKIP_PROVIDER_{provider.upper()}",
+        usage=f"Skip tests using the {provider} provider",
     )
-    parser.addoption(
-        "--lab",
-        action="store",
-        help="Name of the lab to use. Overrides the value set in the INMANTA_TERRAFORM_LAB environment variable.",
+    for provider in (
+        "checkpoint",
+        "fortios",
+        "github",
+        "gitlab",
+        "local",
     )
+]
+
+
+def pytest_addoption(parser: Parser) -> None:
+    """
+    Setting up test parameters
+    """
+    group = parser.getgroup("terraform", description="Terraform module testing options")
+    parameters: List[TestParameter] = [cache_dir, lab]
+    parameters.extend(provider_parameters)
+    for param in parameters:
+        group.addoption(
+            param.argument,
+            action=param.action,
+            help=param.help,
+        )
+
+
+def pytest_configure(config: Config) -> None:
+    """
+    Registering markers
+    """
+    for provider_parameter in provider_parameters:
+        name = (
+            provider_parameter.argument.strip("--")
+            .replace("-", "_")
+            .replace("_skip_", "_")
+        )
+        config.addinivalue_line(
+            "markers",
+            f"{name}: mark test to run only with option {provider_parameter.argument} is not set",
+        )
+
+
+def pytest_runtest_setup(item: Item) -> None:
+    """
+    Checking if a provider test should be skipped or not
+    """
+    for provider_parameter in provider_parameters:
+        name = (
+            provider_parameter.argument.strip("--")
+            .replace("-", "_")
+            .replace("_skip_", "_")
+        )
+        if name not in item.keywords:
+            # The test is not marked
+            continue
+
+        if provider_parameter.resolve(item.config):
+            # The test should be skipped
+            pytest.skip(
+                f"This test is only executed with option {provider_parameter.argument}"
+            )
 
 
 @pytest.fixture(scope="session")
-def lab_name(request) -> str:
-    pytest_option: Optional[str] = request.config.getoption("--lab")
-    lab_name: Optional[str] = (
-        pytest_option
-        if pytest_option is not None
-        else os.environ.get("INMANTA_TERRAFORM_LAB", None)
-    )
-
-    if lab_name is None:
-        raise Exception("This test requires the --lab option to be set")
-
-    return lab_name
+def lab_name(request: pytest.FixtureRequest) -> str:
+    return lab.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -93,8 +160,9 @@ def function_temp_dir(session_temp_dir: str) -> str:
 
 @pytest.fixture(scope="function")
 def cache_agent_dir(function_temp_dir: str, request: pytest.FixtureRequest) -> str:
-    fixed_cache_dir = request.config.getoption("--cache-dir")
-    if not fixed_cache_dir:
+    try:
+        fixed_cache_dir = cache_dir.resolve(request.config)
+    except ParameterNotSetException:
         LOGGER.warning(
             "Fixture 'use_agent_cache_dir' was called without setting a cache directory"
         )

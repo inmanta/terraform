@@ -34,7 +34,6 @@ from inmanta_plugins.terraform.tf.terraform_resource_client import (
 )
 from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
-from inmanta import resources
 from inmanta.agent import config
 from inmanta.agent.agent import AgentInstance
 from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, provider
@@ -269,9 +268,7 @@ class TerraformResourceHandler(CRUDHandler):
 
         Path(self.log_file_path).unlink()
 
-    def read_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
-    ) -> None:
+    def read_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """
         During the read phase, we need to:
          - Read the state, if there is none, we either:
@@ -300,9 +297,7 @@ class TerraformResourceHandler(CRUDHandler):
             k: current_state.get(k) for k in desired_state.keys()
         }
 
-    def create_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
-    ) -> None:
+    def create_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """
         During the create phase, we need to:
          - Create the new resource with the provider process
@@ -329,7 +324,7 @@ class TerraformResourceHandler(CRUDHandler):
         ctx.set_created()
 
     def update_resource(
-        self, ctx: HandlerContext, changes: dict, resource: resources.PurgeableResource
+        self, ctx: HandlerContext, changes: dict, resource: TerraformResource
     ) -> None:
         """
         During the update phase, we need to:
@@ -356,9 +351,7 @@ class TerraformResourceHandler(CRUDHandler):
 
         ctx.set_updated()
 
-    def delete_resource(
-        self, ctx: HandlerContext, resource: resources.PurgeableResource
-    ) -> None:
+    def delete_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """
         During the delete phase, we need to:
          - Read the current state

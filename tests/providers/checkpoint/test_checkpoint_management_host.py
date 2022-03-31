@@ -49,6 +49,7 @@ def host_is_deployed(checkpoint_client: CheckpointClient, name: str) -> bool:
 
 
 @pytest.mark.asyncio
+@pytest.mark.terraform_provider_checkpoint
 async def test_crud(
     project: Project,
     server: Server,

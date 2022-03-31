@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 - 16/03/2022
+- Use conditional requirement for inmanta-dev-dependencies package
+
+## 1.0.5 - 19/01/2022
+- Fine-grained test selection, based on the provider used (#20)
+
 ## 1.0.4 - 11/01/2022
 - Fixed time-zone awareness issues in test cases (#17)
 
