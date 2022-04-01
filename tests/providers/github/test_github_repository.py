@@ -39,7 +39,6 @@ def repository_is_deployed(client: GithubClient, repository_name: str) -> bool:
     return client.get_repository(repository_name) is not None
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_github
 async def test_crud(
     project: Project,

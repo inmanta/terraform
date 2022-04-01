@@ -55,7 +55,6 @@ def assert_managed_switch_ports_configured(
         assert switch_port["vlan"] == port.vlan
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_fortios
 async def test_ports_update(
     project: Project,

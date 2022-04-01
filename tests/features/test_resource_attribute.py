@@ -35,7 +35,6 @@ from inmanta.server.protocol import Server
 LOGGER = logging.getLogger(__name__)
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_local
 async def test_plugin(
     project: Project,
