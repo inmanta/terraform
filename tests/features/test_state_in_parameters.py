@@ -57,7 +57,6 @@ async def get_param(
     assert False, f"Unexpected response from server: {result.code}, {result.message}"
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_local
 async def test_store(
     project: Project,
@@ -145,7 +144,6 @@ async def test_store(
     ), "The state should have been removed, but wasn't"
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_local
 async def test_create_failed(
     project: Project,
@@ -241,7 +239,6 @@ async def test_create_failed(
     assert not file_path_object.exists()
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_local
 async def test_update_failed(
     project: Project,

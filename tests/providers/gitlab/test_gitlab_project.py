@@ -39,7 +39,6 @@ def project_is_deployed(path: str, client: GitlabClient) -> bool:
     return client.get_project(path) is not None
 
 
-@pytest.mark.asyncio
 @pytest.mark.terraform_provider_gitlab
 async def test_crud(
     project: Project,

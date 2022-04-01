@@ -1,4 +1,6 @@
 # Changelog
+## 1.0.8 - 01/04/2022
+- Add pytest-asyncio mode to remove deprecation warnings.
 
 ## 1.0.7 - 16/03/2022
 - Use conditional requirement for inmanta-dev-dependencies package
