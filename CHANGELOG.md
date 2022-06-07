@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.9 - 07/06/2022
+## 1.0.10 - 07/06/2022
 - Remove double / from terraform registry URL
 
 ## 1.0.8 - 01/04/2022
