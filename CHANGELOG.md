@@ -1,4 +1,8 @@
 # Changelog
+
+## 1.0.10 - 07/06/2022
+- Remove double / from terraform registry URL
+
 ## 1.0.8 - 01/04/2022
 - Add pytest-asyncio mode to remove deprecation warnings.
 
