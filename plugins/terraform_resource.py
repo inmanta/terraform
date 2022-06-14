@@ -28,11 +28,13 @@ from inmanta_plugins.terraform.helpers.utils import (
     build_resource_state,
     parse_resource_state,
 )
+from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
+    TerraformResourceStateInmanta,
+)
 from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
 from inmanta_plugins.terraform.tf.terraform_resource_client import (
     TerraformResourceClient,
 )
-from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
 from inmanta.agent import config
 from inmanta.agent.agent import AgentInstance
@@ -235,10 +237,10 @@ class TerraformResourceHandler(CRUDHandler):
             Id.resource_str(resource.id),
         )
 
-        terraform_resource_state = TerraformResourceState(
+        terraform_resource_state = TerraformResourceStateInmanta(
+            type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
-            type_name=resource.resource_type,
         )
 
         self.resource_client = TerraformResourceClient(

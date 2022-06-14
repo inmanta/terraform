@@ -178,7 +178,7 @@ class ProviderInstaller:
                     continue
 
                 binary_name = info.filename
-                binary_file = install_dir / Path(binary_name)
+                binary_file = install_dir / binary_name
 
             if binary_name is None:
                 raise InstallerException(
