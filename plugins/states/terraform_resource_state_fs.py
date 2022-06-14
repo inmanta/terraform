@@ -20,44 +20,25 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
 
-class TerraformResourceStateInmanta(TerraformResourceState):
-    """
-    This terraform resource state object allows the resource to have a resilient state
-    storage, so that it does not get lost between program execution.  It is meant to be
-    used with an Inmanta orchestrator.  It stores the private value into a local file
-    and the state in the parameters of the orchestrator.
-    """
-
+class TerraformResourceStateFileSystem(TerraformResourceState):
     def __init__(
         self,
         type_name: str,
+        resource_id: str,
         *,
         private_file_path: str,
-        param_client: ParamClient,
+        state_file_path: str,
         private: Optional[bytes] = None,
         state: Optional[dict] = None,
     ) -> None:
-        """
-        :attr type_name: The name that the provider give to this resource
-        :attr private_file_path: A path to a file (existing or not) that can be used
-            to store the private value of the resource.
-        :attr param_client: A client that can be used to store the resource state in
-            the orchestrator parameters.
-        :attr private: An initial private value for this resource
-        :attr state: An initial state for this resource
-        """
         super().__init__(
-            type_name=type_name,
-            resource_id=param_client.resource_id,
-            private=private,
-            state=state,
+            type_name=type_name, resource_id=resource_id, private=private, state=state
         )
         self._private_file_path = Path(private_file_path)
-        self._param_client = param_client
+        self._state_file_path = Path(state_file_path)
 
     @property
     def private(self) -> Optional[bytes]:
@@ -75,14 +56,12 @@ class TerraformResourceStateInmanta(TerraformResourceState):
     @property
     def state(self) -> Optional[dict]:
         """
-        The state is a dictionary containing the current state of the resource.  It is stored in a parameter
-        on the server.  When this property is called, we only request the parameter from the server if the
-        cached value is None.  This means that the value seen by this object can only be altered by this object.
+        The state is a dictionary containing the current state of the resource.
+        We store this in a local file, and cache it in a variable, only reading the file if the variable
+        if None.  This means that the value seen by this object can only be altered by this object.
         """
-        if self._state is None:
-            param_value = self._param_client.get()
-            if param_value is not None:
-                self._state = json.loads(param_value)
+        if self._state is None and self._state_file_path.exists():
+            self._state = json.loads(self._state_file_path.read_text(encoding="utf-8"))
 
         return self._state
 
@@ -99,10 +78,10 @@ class TerraformResourceStateInmanta(TerraformResourceState):
     @state.setter
     def state(self, value: dict) -> None:
         """
-        Every time a new value for the state is set, we save it in the parameter corresponding to it. And update
-        the cached value.
+        Every time a new value for the state is set, we save it in the state file. And update the cached value.
         """
-        self._param_client.set(json.dumps(value))
+        self._state_file_path.parent.mkdir(parents=True, exist_ok=True)
+        self._state_file_path.write_text(json.dumps(value), encoding="utf-8")
 
         self._state = value
 
@@ -113,6 +92,8 @@ class TerraformResourceStateInmanta(TerraformResourceState):
          - delete the parameter containing the state
         """
         super().purge()
-        self._param_client.delete()
         if self._private_file_path.exists():
             self._private_file_path.unlink()
+
+        if self._state_file_path.exists():
+            self._state_file_path.unlink()
