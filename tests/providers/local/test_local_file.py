@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import logging
+import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
@@ -32,6 +33,83 @@ from inmanta.protocol.endpoints import Client
 from inmanta.server.protocol import Server
 
 LOGGER = logging.getLogger(__name__)
+
+
+@pytest.mark.terraform_provider_local
+def test_standalone(
+    project: Project,
+    provider: LocalProvider,
+    function_temp_dir: str,
+    cache_agent_dir: str,
+) -> None:
+    """
+    The purpose of this test is to make sure that the terraform helpers can be
+    used without an inmanta handler (in the generator for example).
+    We still import the project fixture so that the plugins get installed in
+    the inmanta_plugins package.
+    """
+    from inmanta_plugins.terraform.tf.terraform_provider import TerraformProvider
+    from inmanta_plugins.terraform.tf.terraform_provider_installer import (
+        ProviderInstaller,
+    )
+    from inmanta_plugins.terraform.tf.terraform_resource_client import (
+        TerraformResourceClient,
+    )
+    from inmanta_plugins.terraform.tf.terraform_resource_state import (
+        TerraformResourceState,
+    )
+
+    cwd = Path(function_temp_dir)
+
+    provider_installer = ProviderInstaller(
+        namespace=provider.namespace,
+        type=provider.type,
+        version=provider.version,
+    )
+    provider_installer.resolve()
+    provider_installer.download(str(cwd / "download.zip"))
+    provider_path = provider_installer.install(str(cwd))
+
+    resource_state = TerraformResourceState(
+        type_name="local_file",
+        resource_id="file",
+    )
+
+    generate_file_path = cwd / "file.txt"
+
+    with TerraformProvider(
+        provider_path=provider_path,
+        log_file_path=os.path.join(function_temp_dir, "provider.log"),
+    ) as p:
+        LOGGER.debug(p.schema)
+        assert not p.ready
+        p.configure({})
+        assert p.ready
+
+        client = TerraformResourceClient(
+            provider=p,
+            resource_state=resource_state,
+            logger=LOGGER,
+        )
+        LOGGER.debug(client.resource_schema)
+
+        assert not generate_file_path.exists()
+
+        client.create_resource(
+            {
+                "filename": str(generate_file_path),
+                "content": "Hello World",
+            }
+        )
+
+        assert generate_file_path.exists()
+        assert generate_file_path.read_text() == "Hello World"
+
+        client.delete_resource()
+
+        assert not generate_file_path.exists()
+
+    assert not p.ready
 
 
 @pytest.mark.terraform_provider_local

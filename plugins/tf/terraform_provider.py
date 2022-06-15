@@ -87,7 +87,7 @@ class TerraformProvider:
         self._configured = False
 
         # This logger will go into the agent's logs
-        self.logger = logging.getLogger(self._name + "-provider")
+        self.logger = logging.getLogger(self._name)
 
     def _io_logger(self, stream: IO[bytes], logger_name: str) -> None:
         # This logger will go into the agent's logs and into a file
@@ -251,7 +251,7 @@ class TerraformProvider:
 
     @property
     def schema(self) -> Any:
-        if not self.ready:
+        if self._proc is None or self._stub is None:
             raise PluginNotReadyException(
                 "Can not get resource schema, provider is not ready"
             )
