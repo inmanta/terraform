@@ -23,11 +23,11 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO, Any, List, Optional, Type
 
-import grpc
+import grpc  # type: ignore
 import inmanta_tfplugin.tfplugin5_pb2 as tfplugin5_pb2  # type: ignore
-import inmanta_tfplugin.tfplugin5_pb2_grpc as tfplugin5_pb2_grpc
+import inmanta_tfplugin.tfplugin5_pb2_grpc as tfplugin5_pb2_grpc  # type: ignore
 
-from inmanta_plugins.terraform.helpers.utils import fill_partial_state  # type: ignore
+from inmanta_plugins.terraform.helpers.utils import fill_partial_state
 
 """
 The two import statements above SHOULD NOT BE REMOVED without proper consideration.
@@ -42,7 +42,7 @@ Changing those imports and having a successfull test run IS NOT ENOUGH to assume
 will work.
 """
 
-import msgpack
+import msgpack  # type: ignore
 
 from inmanta_plugins.terraform.tf.data import Diagnostic
 from inmanta_plugins.terraform.tf.exceptions import (
@@ -121,9 +121,8 @@ class TerraformProvider:
         proto_version = int(parts[1])
         if proto_version not in SUPPORTED_VERSIONS:
             raise PluginInitException(
-                "Invalid protocol version for plugin %d. Only %s supported.",
-                proto_version,
-                SUPPORTED_VERSIONS,
+                "Invalid protocol version for plugin %d. Only %s supported."
+                % (proto_version, SUPPORTED_VERSIONS)
             )
 
         proto_type = parts[2]
@@ -146,7 +145,7 @@ class TerraformProvider:
         """
         base_config = fill_partial_state(provider_config, self.provider_schema.block)
 
-        result = self._stub.Configure(
+        result = self.stub.Configure(
             tfplugin5_pb2.Configure.Request(
                 terraform_version=TERRAFORM_VERSION,
                 config=tfplugin5_pb2.DynamicValue(msgpack=msgpack.packb(base_config)),
@@ -191,13 +190,19 @@ class TerraformProvider:
 
         self.logger.debug(f"Started plugin with pid {self._proc.pid}")
 
-        line = self._proc.stdout.readline().decode().strip()
+        stdout = self._proc.stdout
+        assert stdout is not None
+
+        stderr = self._proc.stderr
+        assert stderr is not None
+
+        line = stdout.readline().decode().strip()
         proto_addr = self._parse_proto(line)
 
         self._stdout_thread = threading.Thread(
             target=self._io_logger,
             args=(
-                self._proc.stdout,
+                stdout,
                 self.logger.name + "-stdout",
             ),
         )
@@ -206,7 +211,7 @@ class TerraformProvider:
         self._stderr_thread = threading.Thread(
             target=self._io_logger,
             args=(
-                self._proc.stderr,
+                stderr,
                 self.logger.name + "-stderr",
             ),
         )

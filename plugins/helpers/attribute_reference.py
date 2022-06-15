@@ -38,6 +38,7 @@ class AttributeReference:
             INMANTA_MAGIC_KEY: True,
         }
 
+    @staticmethod
     def from_dict(input: dict) -> "AttributeReference":
         required_keys = {
             "environment",
@@ -52,13 +53,13 @@ class AttributeReference:
             )
 
         return AttributeReference(
-            environment=input.get("environment"),
-            resource_id=input.get("resource_id"),
-            attribute_path=input.get("attribute_path"),
+            environment=input["environment"],
+            resource_id=input["resource_id"],
+            attribute_path=input["attribute_path"],
         )
 
     def extract_from_state(self, state: dict) -> Any:
-        value = state
+        value: Any = state
         for attribute in self.attribute_path:
             if isinstance(attribute, str):
                 if not isinstance(value, dict):

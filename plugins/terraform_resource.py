@@ -38,11 +38,11 @@ from inmanta_plugins.terraform.helpers.utils import (
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
     TerraformResourceStateInmanta,
 )
+from inmanta_plugins.terraform.tf.terraform_provider import TerraformProvider
 from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
 from inmanta_plugins.terraform.tf.terraform_resource_client import (
     TerraformResourceClient,
 )
-from plugins.tf.terraform_provider import TerraformProvider
 
 
 @resource(
@@ -239,7 +239,7 @@ class TerraformResourceHandler(CRUDHandler):
         private_path.touch(exist_ok=True)
 
         param_client = ParamClient(
-            self._agent.environment,
+            str(self._agent.environment),
             Client("agent"),
             lambda func: self.run_sync(func),
             TERRAFORM_RESOURCE_STATE_PARAMETER,

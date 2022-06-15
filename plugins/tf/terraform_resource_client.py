@@ -34,7 +34,7 @@ Changing those imports and having a successfull test run IS NOT ENOUGH to assume
 will work.
 """
 
-import msgpack
+import msgpack  # type: ignore
 
 from inmanta_plugins.terraform.helpers.utils import fill_partial_state
 from inmanta_plugins.terraform.tf.exceptions import PluginException

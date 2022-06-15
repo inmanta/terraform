@@ -27,6 +27,7 @@ mypy-plugins:
 	@ echo -e "Running mypy on the module plugins\n..."
 	@ mkdir -p inmanta_plugins;\
 		touch inmanta_plugins/__init__.py;\
+		touch inmanta_plugins/py.typed;\
 		stat inmanta_plugins/terraform > /dev/null || ln -s ../plugins inmanta_plugins/terraform
 	@ $(RUN_MYPY_PLUGINS)
 
