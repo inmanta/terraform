@@ -16,7 +16,6 @@
     Contact: code@inmanta.com
 """
 import logging
-import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
@@ -79,7 +78,7 @@ def test_standalone(
 
     with TerraformProvider(
         provider_path=provider_path,
-        log_file_path=os.path.join(function_temp_dir, "provider.log"),
+        log_file_path=str(cwd / "provider.log"),
     ) as p:
         LOGGER.debug(p.schema)
         assert not p.ready

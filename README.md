@@ -1,6 +1,7 @@
 # terraform Module
 
-This modules is an interface between any terraform provider and inmanta.  It allows to quickly have a basic support of any technology that terraform supports in an inmanta model, managed by an inmanta orchestrator.
+This modules is an interface between any terraform provider and inmanta.  It allows to quickly have a basic support of any technology that terraform supports in an inmanta model, managed by an inmanta orchestrator.  
+All the logic packed into the module is also usable as a standalone terraform provider client sdk.  More information about this can be found in the examples.
 
 ## Terraform features
 Terraform has some features that do not translate directly to existing inmanta features (the opposite is true too).  For those, some workarounds needed to be found.  Here bellow are presented the main terraform features, and a short description of how we deal with those.
