@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0 - 16/06/2022
+- Decouple the terraform provider client sdk from the inmanta handler logic.
+
 ## 1.0.10 - 07/06/2022
 - Remove double / from terraform registry URL
 
