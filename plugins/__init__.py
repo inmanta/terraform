@@ -18,16 +18,15 @@
 import json
 from typing import Dict, Optional
 
-from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
-from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
-from inmanta_plugins.terraform.helpers.param_client import ParamClient
-
 import inmanta.resources
 from inmanta.config import Config
-from inmanta.execute.proxy import SequenceProxy
+from inmanta.execute.proxy import DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
+from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
+from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
+from inmanta_plugins.terraform.helpers.param_client import ParamClient
 
 # This dict contains all resource parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
@@ -41,8 +40,8 @@ def inmanta_reset_state() -> None:
 
 
 def resource_attribute_reference(
-    resource: "terraform::Resource",  # type: ignore
-    attribute_path: "any",  # type: ignore
+    resource: DynamicProxy,  # type: ignore
+    attribute_path: SequenceProxy,  # type: ignore
 ) -> AttributeReference:
     resource_id = inmanta.resources.to_id(resource)
     if resource_id is None:
@@ -105,13 +104,13 @@ def get_resource_attribute(
     param_client = ParamClient(
         environment=attribute_reference.environment,
         client=context.get_client(),
-        run_sync=lambda func: context.run_sync(func),
+        run_sync=lambda func: context.run_sync(func),  # type: ignore
         param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
         resource_id=attribute_reference.resource_id,
     )
 
-    resource_state: Optional[str] = param_client.get()
-    if resource_state is None:
+    resource_state_raw: Optional[str] = param_client.get()
+    if resource_state_raw is None:
         unknown_parameters.append(
             {
                 "resource": attribute_reference.resource_id,
@@ -121,7 +120,7 @@ def get_resource_attribute(
         )
         return Unknown(source=resource)
 
-    resource_state: dict = json.loads(resource_state)
+    resource_state = json.loads(resource_state_raw)
     resource_states.setdefault(attribute_reference.resource_id, resource_state)
 
     try:

@@ -21,18 +21,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-
-from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
-from inmanta_plugins.terraform.helpers.param_client import ParamClient
-from inmanta_plugins.terraform.helpers.utils import (
-    build_resource_state,
-    parse_resource_state,
-)
-from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
-from inmanta_plugins.terraform.tf.terraform_resource_client import (
-    TerraformResourceClient,
-)
-from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
+from typing import Optional
 
 from inmanta.agent import config
 from inmanta.agent.agent import AgentInstance
@@ -40,6 +29,20 @@ from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, p
 from inmanta.agent.io.local import IOBase
 from inmanta.protocol.endpoints import Client
 from inmanta.resources import Id, PurgeableResource, resource
+from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
+from inmanta_plugins.terraform.helpers.param_client import ParamClient
+from inmanta_plugins.terraform.helpers.utils import (
+    build_resource_state,
+    parse_resource_state,
+)
+from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
+    TerraformResourceStateInmanta,
+)
+from inmanta_plugins.terraform.tf.terraform_provider import TerraformProvider
+from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
+from inmanta_plugins.terraform.tf.terraform_resource_client import (
+    TerraformResourceClient,
+)
 
 
 @resource(
@@ -106,9 +109,17 @@ class TerraformResource(PurgeableResource):
 class TerraformResourceHandler(CRUDHandler):
     def __init__(self, agent: "AgentInstance", io: "IOBase") -> None:
         super().__init__(agent, io=io)
-        self.resource_client = None
+        self.provider: Optional[TerraformProvider] = None
+        self._resource_client: Optional[TerraformResourceClient] = None
         self.log_file_path = ""
         self.private_file_path = ""
+
+    @property
+    def resource_client(self) -> TerraformResourceClient:
+        if self._resource_client is None:
+            raise RuntimeError("The resource client is not setup")
+
+        return self._resource_client
 
     def _agent_state_dir(self, resource: TerraformResource) -> str:
         # Files used by the handler should go in state_dir/cache/<module-name>/<agent-id>/
@@ -228,25 +239,31 @@ class TerraformResourceHandler(CRUDHandler):
         private_path.touch(exist_ok=True)
 
         param_client = ParamClient(
-            self._agent.environment,
+            str(self._agent.environment),
             Client("agent"),
             lambda func: self.run_sync(func),
             TERRAFORM_RESOURCE_STATE_PARAMETER,
             Id.resource_str(resource.id),
         )
 
-        terraform_resource_state = TerraformResourceState(
+        terraform_resource_state = TerraformResourceStateInmanta(
+            type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
-            type_name=resource.resource_type,
         )
 
-        self.resource_client = TerraformResourceClient(
+        self.provider = TerraformProvider(
             binary_path,
             self.log_file_path,
-            terraform_resource_state,
         )
-        self.resource_client.open(resource.provider_config)
+        self.provider.open()
+        self.provider.configure(resource.provider_config)
+
+        self._resource_client = TerraformResourceClient(
+            self.provider,
+            terraform_resource_state,
+            ctx.logger,
+        )
 
         resource.resource_config = build_resource_state(
             resource.resource_config,
@@ -260,7 +277,9 @@ class TerraformResourceHandler(CRUDHandler):
          - Stop the provider process
          - Cleanup the logs
         """
-        self.resource_client.close()
+        if self.provider is not None:
+            self.provider.close()
+
         with open(self.log_file_path, "r") as f:
             lines = f.readlines()
             if lines:

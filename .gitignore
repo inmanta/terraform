@@ -4,3 +4,6 @@ trace.txt
 personal_env.sh
 mypy
 .mypy_cache
+
+# For v1 module development
+inmanta_plugins/

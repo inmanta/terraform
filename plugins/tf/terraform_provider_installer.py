@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import requests
+
 from inmanta_plugins.terraform.tf.exceptions import (
     InstallerException,
     InstallerNotReadyException,
@@ -38,9 +39,38 @@ class ProviderInstaller:
         self.namespace = namespace
         self.type = type
         self.version = version
-        self.download_url = None
-        self.shasum = None
-        self.download_path = None
+        self._download_url: Optional[str] = None
+        self._shasum: Optional[str] = None
+        self._download_path: Optional[str] = None
+        self._filename: Optional[str] = None
+
+    @property
+    def download_url(self) -> str:
+        if self._download_url is None:
+            raise ValueError("Download url has not been set")
+
+        return self._download_url
+
+    @property
+    def download_path(self) -> str:
+        if self._download_path is None:
+            raise ValueError("Download path has not been set")
+
+        return self._download_path
+
+    @property
+    def filename(self) -> str:
+        if self._filename is None:
+            raise ValueError("Filename has not been set")
+
+        return self._filename
+
+    @property
+    def shasum(self) -> str:
+        if self._shasum is None:
+            raise ValueError("Shasum has not been set")
+
+        return self._shasum
 
     def resolve(self):
         """
@@ -70,9 +100,9 @@ class ProviderInstaller:
         )
         response.raise_for_status()
         data = response.json()
-        self.download_url = data.get("download_url")
-        self.filename = data.get("filename")
-        self.shasum = data.get("shasum", None)
+        self._download_url = data.get("download_url")
+        self._filename = data.get("filename")
+        self._shasum = data.get("shasum", None)
 
     def download(self, download_path: Optional[str] = None) -> str:
         """
@@ -86,7 +116,7 @@ class ProviderInstaller:
             parent directory.
         :return: The path to the downloaded archive
         """
-        if self.download_url is None:
+        if self._download_url is None:
             raise InstallerNotReadyException(
                 "Can not download provider, not download url provided, did you call 'resolve()' already?"
             )
@@ -100,14 +130,14 @@ class ProviderInstaller:
 
         # If we already have a file there, and we have a shasum, we check if the file is
         # already the one we want to download
-        if download_location.is_file() and self.shasum is not None:
+        if download_location.is_file() and self._shasum is not None:
             with open(download_path, "rb") as f:
                 sha256_hash = hashlib.sha256()
                 for chunk in iter(lambda: f.read(4096), b""):
                     sha256_hash.update(chunk)
 
                 if self.shasum == sha256_hash.hexdigest():
-                    self.download_path = download_path
+                    self._download_path = download_path
                     return self.download_path
 
         # The download file should be a file, not a directory
@@ -125,12 +155,12 @@ class ProviderInstaller:
 
         # At this point, if the checksum is wrong, we got a wrong file
         checksum = sha256_hash.hexdigest()
-        if self.shasum is not None and checksum != self.shasum:
+        if self._shasum is not None and checksum != self.shasum:
             raise InstallerException(
                 f"Downloaded file has a bad hash: {checksum} (expected {self.shasum})"
             )
 
-        self.download_path = download_path
+        self._download_path = download_path
 
         return self.download_path
 
@@ -143,7 +173,7 @@ class ProviderInstaller:
         :param install_location: The directory in which the binary should be installed
         :return: The path to the extracted binary, The name of the binary inside the archive
         """
-        if self.download_path is None:
+        if self._download_path is None:
             raise InstallerNotReadyException(
                 "Can not install provider, not download path provided, did you call 'download()' already?"
             )
@@ -178,7 +208,7 @@ class ProviderInstaller:
                     continue
 
                 binary_name = info.filename
-                binary_file = install_dir / Path(binary_name)
+                binary_file = install_dir / binary_name
 
             if binary_name is None:
                 raise InstallerException(
@@ -200,15 +230,15 @@ class ProviderInstaller:
         :return: The path to the extracted binary
         """
         binary_file, binary_name = self.install_dry_run(install_location)
-        binary_file = Path(binary_file)
-        if binary_file.exists() and not force:
+        binary_file_path = Path(binary_file)
+        if binary_file_path.exists() and not force:
             raise InstallerException(
-                f"Installing this binary would overwrite the following file: {str(binary_file)}"
+                f"Installing this binary would overwrite the following file: {binary_file}"
             )
 
         with zipfile.ZipFile(self.download_path, "r") as zip:
-            zip.extract(str(binary_name), install_location)
+            zip.extract(binary_name, install_location)
 
-        binary_file.chmod(0o774)
+        binary_file_path.chmod(0o774)
 
-        return str(binary_file)
+        return binary_file

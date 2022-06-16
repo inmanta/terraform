@@ -20,11 +20,15 @@ format:
 pep8:
 	$(flake8)
 
-RUN_MYPY_PLUGINS=MYPYPATH=docs python -m mypy --html-report mypy/out/inmanta_plugins -p inmanta_plugins.terraform --exclude inmanta_plugins.terraform.tfplugin5.*
+RUN_MYPY_PLUGINS=python -m mypy --html-report mypy/out/inmanta_plugins -p inmanta_plugins.terraform --exclude inmanta_plugins.terraform.tfplugin5.*
 RUN_MYPY_TESTS=MYPYPATH=tests python -m mypy --html-report mypy/out/tests tests
 
 mypy-plugins:
 	@ echo -e "Running mypy on the module plugins\n..."
+	@ mkdir -p inmanta_plugins;\
+		touch inmanta_plugins/__init__.py;\
+		touch inmanta_plugins/py.typed;\
+		stat inmanta_plugins/terraform > /dev/null || ln -s ../plugins inmanta_plugins/terraform
 	@ $(RUN_MYPY_PLUGINS)
 
 mypy-tests:

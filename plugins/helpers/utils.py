@@ -16,19 +16,16 @@
     Contact: code@inmanta.com
 """
 import json
-from typing import Any, Callable, TypeVar
+from typing import Any, Dict
 
+from inmanta.agent.handler import SkipResource
+from inmanta.protocol.endpoints import Client
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import (
     INMANTA_MAGIC_KEY,
     TERRAFORM_RESOURCE_STATE_PARAMETER,
 )
-from inmanta_plugins.terraform.helpers.param_client import ParamClient
-
-from inmanta.agent.handler import SkipResource
-from inmanta.protocol.endpoints import Client
-
-T = TypeVar("T")
+from inmanta_plugins.terraform.helpers.param_client import RUN_SYNC, ParamClient
 
 
 def parse_resource_state(current_state: dict, block: Any) -> dict:
@@ -38,6 +35,7 @@ def parse_resource_state(current_state: dict, block: Any) -> dict:
     an attribute is generated (or computed), we need to go though the schema at the same time.
     """
     parsed_state = dict()
+    key: str
 
     # First we iterate over the attributes of this block
     for attribute in block.attributes:
@@ -46,7 +44,7 @@ def parse_resource_state(current_state: dict, block: Any) -> dict:
             # as it can't possibly come from our model
             continue
 
-        key: str = attribute.name
+        key = attribute.name
         current = current_state.get(key)
 
         if current is None:
@@ -57,7 +55,7 @@ def parse_resource_state(current_state: dict, block: Any) -> dict:
 
     # Then we iterate over the nested blocks of this block
     for nested_block in block.block_types:
-        key: str = nested_block.type_name
+        key = nested_block.type_name
         current = current_state.get(key)
 
         if current is None:
@@ -107,7 +105,7 @@ def fill_partial_state(state: dict, schema_block: Any) -> dict:
         )
 
     # This part handles all the attributes of the block
-    base_conf = {x.name: None for x in schema_block.attributes}
+    base_conf: Dict[str, object] = {x.name: None for x in schema_block.attributes}
     base_conf.update(state)
 
     # This part handles all the nested blocks
@@ -164,8 +162,8 @@ def fill_partial_state(state: dict, schema_block: Any) -> dict:
 def build_resource_state(
     desired_state: Any,
     client: Client,
-    run_sync: Callable[[Callable[[], T]], T],
-) -> dict:
+    run_sync: RUN_SYNC,
+) -> Any:
     """
     This function explores a state dictionnary looking for attribute references.
     It returns a copy of the input state dict, with all instances of the attribute
@@ -188,14 +186,14 @@ def build_resource_state(
                 param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
                 resource_id=attribute_reference.resource_id,
             )
-            foreign_state = param_client.get()
-            if foreign_state is None:
+            foreign_state_raw = param_client.get()
+            if foreign_state_raw is None:
                 raise SkipResource(
                     "Can not get an attribute from an unknown resource.  "
                     f"State of {attribute_reference.resource_id} can not be found."
                 )
 
-            foreign_state: dict = json.loads(foreign_state)
+            foreign_state = json.loads(foreign_state_raw)
             return attribute_reference.extract_from_state(foreign_state)
 
         return {
