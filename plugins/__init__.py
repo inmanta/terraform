@@ -16,10 +16,12 @@
     Contact: code@inmanta.com
 """
 import json
+import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
+from inmanta.ast import OptionalValueException
 from inmanta.config import Config
 from inmanta.execute.proxy import DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
@@ -239,3 +241,25 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
         d[key] = dd
 
     return d
+
+
+@plugin
+def deprecated_config_block(config_block: "terraform::config::Block") -> None:  # type: ignore
+    """
+    Log a warning for the usage of a deprecated config block
+    """
+    config_path = []
+    block = config_block
+    while block is not None:
+        config_path.append(block.name)
+
+        try:
+            block = block.parent
+        except OptionalValueException:
+            block = None
+
+    config_path_str = ".".join(reversed(config_path))
+
+    logging.getLogger(__name__).warning(
+        f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+    )

@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import logging
+import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
@@ -105,6 +106,39 @@ def test_config_serialization(project: Project):
     assert root_block._config["children"] == [alice, bob] or root_block._config[
         "children"
     ] == [bob, alice]
+
+
+def test_deprecated_config(project: Project) -> None:
+    model = """
+        import terraform::config
+
+        terraform::config::Block(
+            name="root",
+            attributes={},
+            deprecated=true,
+            parent=null,
+        )
+    """
+
+    # Compile a first time to setup the project
+    project.compile(model, no_dedent=False)
+
+    # Compile a second time in a separate process to catch the logs
+    result = subprocess.Popen(
+        "python -m inmanta.app -v compile",
+        shell=True,
+        cwd=project._test_project_dir,
+        encoding="utf-8",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, stderr = result.communicate()
+    assert result.returncode == 0, stderr
+    assert (
+        stdout
+        == "inmanta_plugins.terraformWARNING The usage of config 'root' at ./main.cf:3 is deprecated\n"
+    )
 
 
 @pytest.mark.terraform_provider_local

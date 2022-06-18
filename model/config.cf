@@ -149,7 +149,7 @@ implementation deprecation_warning for Block:
     """
     Send a warning that the usage of this block is deprecated
     """
-    # TODO
+    deprecated_config_block(self)
 end
 
 
