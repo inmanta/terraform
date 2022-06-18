@@ -17,7 +17,7 @@
 """
 import json
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
 from inmanta.config import Config
