@@ -16,8 +16,18 @@
     Contact: code@inmanta.com
 """
 import logging
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
+from uuid import UUID
 
+import pytest
+from helpers.utils import deploy_model
 from pytest_inmanta.plugin import Project
+
+from inmanta.agent.agent import Agent
+from inmanta.const import VersionState
+from inmanta.protocol.endpoints import Client
+from inmanta.server.protocol import Server
 
 LOGGER = logging.getLogger(__name__)
 
@@ -95,3 +105,81 @@ def test_config_serialization(project: Project):
     assert root_block._config["children"] == [alice, bob] or root_block._config[
         "children"
     ] == [bob, alice]
+
+
+@pytest.mark.terraform_provider_local
+async def test_block_config(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    function_temp_dir: str,
+    cache_agent_dir: str,
+):
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={"hashicorp-local-2.1.0": "localhost"},
+        code_loader=False,
+        agent_names=["hashicorp-local-2.1.0"],
+    )
+
+    file_path_object = Path(function_temp_dir) / Path("test-file.txt")
+
+    model = f"""
+        import terraform
+        import terraform::config
+
+        # Overwritting agent config to disable autostart.  Agents have to be started
+        # manually in the tests.
+        prov_agent_config = std::AgentConfig(
+            autostart=false,
+            agentname="hashicorp-local-2.1.0",
+            uri="local:",
+            provides=prov,
+        )
+
+        prov = terraform::Provider(
+            namespace="hashicorp",
+            type="local",
+            version="2.1.0",
+            alias="",
+            auto_agent=false,
+            agent_config=prov_agent_config,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name="root",
+                attributes={{}},
+            ),
+        )
+
+        res = terraform::Resource(
+            type="local_file",
+            name="test",
+            purged=false,
+            send_event=true,
+            provider=prov,
+            requires=prov,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name="root",
+                attributes={{
+                    "filename": "{file_path_object}",
+                    "content": "test",
+                }},
+            ),
+        )
+    """
+
+    assert not file_path_object.exists()
+
+    # Create
+    assert (
+        await deploy_model(project, model, client, environment) == VersionState.success
+    )
+
+    assert file_path_object.exists()
+    assert file_path_object.read_text("utf-8") == "test"
