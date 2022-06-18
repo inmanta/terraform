@@ -17,6 +17,7 @@
 """
 import logging
 import subprocess
+import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
@@ -125,8 +126,7 @@ def test_deprecated_config(project: Project) -> None:
 
     # Compile a second time in a separate process to catch the logs
     result = subprocess.Popen(
-        "python -m inmanta.app -v compile",
-        shell=True,
+        [sys.executable, "-m", "inmanta.app", "-v", "compile"],
         cwd=project._test_project_dir,
         encoding="utf-8",
         text=True,
