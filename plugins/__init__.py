@@ -158,7 +158,7 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
     # Build the base dict, containing all the attribute of this block
     d = {k: v for k, v in config_block.attributes.items()}
 
-    sets: Dict[str, Set[Any]] = defaultdict(set)
+    sets: Dict[str, List[Any]] = defaultdict(list)
     lists: Dict[str, Dict[str, Any]] = defaultdict(dict)
     dicts: Dict[str, Dict[str, Any]] = defaultdict(dict)
 
@@ -174,7 +174,7 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
             d[child.name] = child._config
 
         elif child.nesting_mode == "set":
-            sets[child.name].add(child._config)
+            sets[child.name].append(child._config)
 
         elif child.nesting_mode == "list":
             if child.key is None:
@@ -186,7 +186,7 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
                     f"used in {lists[child.name]}"
                 )
 
-            lists[child.name][child.key] = child._dict
+            lists[child.name][child.key] = child._config
 
         elif child.nesting_mode == "dict":
             if child.key is None:
@@ -198,7 +198,7 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
                     f"used in {dicts[child.name]}"
                 )
 
-            dicts[child.name][child.key] = child._dict
+            dicts[child.name][child.key] = child._config
 
         else:
             raise PluginException(f"Uknown nesting type: {child.nesting_mode}")
@@ -227,7 +227,7 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
     # Add all the unordered lists (sets) to the config
     for key, s in sets.items():
-        d[key] = list(s)
+        d[key] = s
 
     # Add all the ordered lists to the config
     for key, l in lists.items():

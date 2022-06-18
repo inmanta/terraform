@@ -60,42 +60,43 @@ entity Block:
 
         .. code-block::
 
-            Block(
+            terraform::config::Block(
                 name="root",
                 attributes={"name": "Albert"},
                 children=[
-                    Block(
+                    terraform::config::Block(
                         name="children",
                         attributes={"name": "Bob", "age": 12},
                         nesting_mode="set",
                     ),
-                    Block(
+                    terraform::config::Block(
                         name="children",
                         attributes={"name": "Alice", "age": 14},
                         nesting_mode="set",
                     ),
-                    Block(
+                    terraform::config::Block(
                         name="pets",
                         attributes={"type": "dog"},
                         nesting_mode="dict",
                         key="Brutus",
                     ),
-                    Block(
+                    terraform::config::Block(
                         name="favorite_dishes",
                         attributes={"name": "Pizza"},
                         nesting_mode="list",
                         key="1",
                     ),
-                    Block(
+                    terraform::config::Block(
                         name="favorite_dishes",
                         attributes={"name": "Pasta"},
                         nesting_mode="list",
                         key="2",
                     )
-                ]
+                ],
+                parent=null,
             )
 
-        It will be serialized as follows:
+        It will be serialized as follows (the order of the children list might differ):
 
         .. code-block::
 
