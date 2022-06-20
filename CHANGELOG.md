@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0 - 20/06/2022
+- Add support for model based config entity tree (for generated modules).
+
 ## 1.1.0 - 16/06/2022
 - Decouple the terraform provider client sdk from the inmanta handler logic.
 

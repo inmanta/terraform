@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import std
+import terraform::config
 
 entity Provider:
     """
@@ -27,6 +28,9 @@ entity Provider:
     :attr alias: An alias to differentiate this provider from other providers with the same binary 
         but different config
     :attr config: The config to apply to this provider
+    :attr manual_config: Whether the user wishes to provide the config as a dict, if false
+        the config should be provided as a config block entity tree via the root_config
+        relation.
     :attr auto_agent: Whether to start an agent automatically or not.  If set to false
         the relation agent_config should be set manually.
     :rel agent_config: This needs to be set only if auto_agent=false
@@ -36,13 +40,20 @@ entity Provider:
     string version = "latest"
     string alias = ""
     dict config
+    bool manual_config = true
 
     bool auto_agent=true
 end
+
 Provider.agent_config [1] -- std::AgentConfig
+"""Relation to the agent config"""
+
+Provider.root_config [0:1] -- terraform::config::Block
+"""Relation to the root configuration, or null if manual_config is true"""
+
 index Provider(namespace, type, version, alias)
 
-implement Provider using std::none
+implement Provider using providerConfig
 implement Provider using agentConfig when auto_agent
 
 implementation agentConfig for Provider:
@@ -54,6 +65,21 @@ implementation agentConfig for Provider:
     )
 end
 
+implementation providerConfig for Provider:
+    """
+    If self.manual_config is true, the user should provide the config as a dict
+    directly to the entity.  The root_config relation should then be set to null.
+    If self.manual_config is false, the user should provide the root_config
+    relation, the Block entity will be serialized and attached to this entity
+    config attribute.
+    """
+    if self.manual_config:
+        self.root_config = null
+    else:
+        self.config = self.root_config._config
+    end
+end
+
 entity Resource extends std::PurgeableResource:
     """
     A Terraform resource
@@ -61,6 +87,9 @@ entity Resource extends std::PurgeableResource:
     :attr type: The type of resource this is
     :attr name: An arbitrary name to identify this resource
     :attr config: The configuration for this resource
+    :attr manual_config: Whether the user wishes to provide the config as a dict, if false
+        the config should be provided as a config block entity tree via the root_config
+        relation.
     :attr terraform_id: If this is set, and the resource state is not stored in parameter yet,
         the handler will first try to import it, using the provided value as terraform id.
     :rel provider: The terraform provider for this resource
@@ -69,9 +98,31 @@ entity Resource extends std::PurgeableResource:
     string name
     string? terraform_id = null
     dict config
+    bool manual_config = true
     bool purge_on_delete = false
 end
+
 Resource.provider [1] -- Provider
+"""Relation to the resource provider"""
+
+Resource.root_config [0:1] -- terraform::config::Block
+"""Relation to the root configuration, or null if manual_config is true"""
+
 index Resource(provider, type, name)
 
-implement Resource using std::none
+implement Resource using resourceConfig
+
+implementation resourceConfig for Resource:
+    """
+    If self.manual_config is true, the user should provide the config as a dict
+    directly to the entity.  The root_config relation should then be set to null.
+    If self.manual_config is false, the user should provide the root_config
+    relation, the Block entity will be serialized and attached to this entity
+    config attribute.
+    """
+    if self.manual_config:
+        self.root_config = null
+    else:
+        self.config = self.root_config._config
+    end
+end

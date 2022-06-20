@@ -16,9 +16,12 @@
     Contact: code@inmanta.com
 """
 import json
-from typing import Dict, Optional
+import logging
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
+from inmanta.ast import OptionalValueException
 from inmanta.config import Config
 from inmanta.execute.proxy import DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
@@ -147,3 +150,121 @@ def get_resource_attribute_ref(
     :param attribute_path: The path, in the resource state dict, to the desired value.
     """
     return resource_attribute_reference(resource, attribute_path).to_dict()
+
+
+@plugin
+def serialize_config(config_block: "terraform::config::Block") -> "dict":  # type: ignore
+    """
+    Serialize a config block into a dictionnary.
+    """
+    for child in config_block.children:
+        # access all required attributes to let the compiler know we need them
+        child.name
+        child._config
+
+    # Build the base dict, containing all the attribute of this block
+    d = {k: v for k, v in config_block.attributes.items()}
+
+    sets: Dict[str, List[Any]] = defaultdict(list)
+    lists: Dict[str, Dict[str, Any]] = defaultdict(dict)
+    dicts: Dict[str, Dict[str, Any]] = defaultdict(dict)
+
+    # For each children, we pick up the config and attach it to this dict.
+    # Depending on the nesting_mode of the child, the way we attach the config will vary.
+    for child in config_block.children:
+        if child.nesting_mode == "single":
+            if child.name in d:
+                raise PluginException(
+                    f"Key {child.name} is already used in the config: {d}"
+                )
+
+            d[child.name] = child._config
+
+        elif child.nesting_mode == "set":
+            sets[child.name].append(child._config)
+
+        elif child.nesting_mode == "list":
+            if child.key is None:
+                raise PluginException("Nesting type dict requires the key to be set")
+
+            if child.key in lists[child.name]:
+                raise PluginException(
+                    f"Can not set key-value pair {child.key}={child._config} as key is already "
+                    f"used in {lists[child.name]}"
+                )
+
+            lists[child.name][child.key] = child._config
+
+        elif child.nesting_mode == "dict":
+            if child.key is None:
+                raise PluginException("Nesting type dict requires the key to be set")
+
+            if child.key in dicts[child.name]:
+                raise PluginException(
+                    f"Can not set key-value pair {child.key}={child._config} as key is already "
+                    f"used in {dicts[child.name]}"
+                )
+
+            dicts[child.name][child.key] = child._config
+
+        else:
+            raise PluginException(f"Uknown nesting type: {child.nesting_mode}")
+
+    # Check for all the dicts we will join that the keys sets don't intersect
+    dict_sets: List[Tuple[str, dict]] = [
+        ("single", d),
+        ("sets", sets),
+        ("lists", lists),
+        ("dicts", dicts),
+    ]
+    for dict_set_name_a, dict_set_a in dict_sets:
+        for dict_set_name_b, dict_set_b in dict_sets:
+            if dict_set_name_a >= dict_set_name_b:
+                # We don't want to compare a set against itself
+                # We don't want to compare sets twice either
+                continue
+
+            intersection = set(dict_set_a.keys()) & set(dict_set_b.keys())
+            if intersection:
+                raise PluginException(
+                    f"The keys {intersection} are present in two part of the config with "
+                    f"unmatching types: {dict_set_name_a}={dict_set_a} "
+                    f"and {dict_set_name_b}={dict_set_b}"
+                )
+
+    # Add all the unordered lists (sets) to the config
+    for key, s in sets.items():
+        d[key] = s
+
+    # Add all the ordered lists to the config
+    for key, l in lists.items():
+        sorted_l = sorted(((k, v) for k, v in l.items()), key=lambda x: x[0])
+        d[key] = [x[1] for x in sorted_l]
+
+    # Add all the dicts to the config
+    for key, dd in dicts.items():
+        d[key] = dd
+
+    return d
+
+
+@plugin
+def deprecated_config_block(config_block: "terraform::config::Block") -> None:  # type: ignore
+    """
+    Log a warning for the usage of a deprecated config block
+    """
+    config_path = []
+    block = config_block
+    while block is not None:
+        config_path.append(block.name)
+
+        try:
+            block = block.parent
+        except OptionalValueException:
+            block = None
+
+    config_path_str = ".".join(reversed(config_path))
+
+    logging.getLogger(__name__).warning(
+        f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+    )
