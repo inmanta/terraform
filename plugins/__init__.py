@@ -157,8 +157,8 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
     """
     Serialize a config block into a dictionnary.
     """
-   for child in config_block.children:
-        # access all required attributes to let the compiler know we need them 
+    for child in config_block.children:
+        # access all required attributes to let the compiler know we need them
         child.name
         child._config
 
