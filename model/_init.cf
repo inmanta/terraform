@@ -76,6 +76,13 @@ implementation providerConfig for Provider:
     if self.manual_config:
         self.root_config = null
     else:
+        # Making sure our root_config will be recognized as such
+        self.root_config.name = null
+        
+        # For the provider, we don't store any state in parameter, so the state
+        # is actually (assumed to be) the current config
+        self.root_config._state = self.root_config._config
+
         self.config = self.root_config._config
     end
 end
@@ -123,6 +130,12 @@ implementation resourceConfig for Resource:
     if self.manual_config:
         self.root_config = null
     else:
+        # Making sure our root_config will be recognized as such
+        self.root_config.name = null
+
+        # Get the state from parameter and attach it to the config block
+        self.root_config._state = get_resource_attribute(self, [])
+
         self.config = self.root_config._config
     end
 end
