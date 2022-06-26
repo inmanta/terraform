@@ -327,12 +327,13 @@ async def test_update_failed(
         == VersionState.failed
     )
 
-    previous_param = param
     param = await get_param_short()
-    assert param is not None, "The state should still be there"
-    assert (
-        param == previous_param
-    ), "The update failed, the current state should be the same"
+    assert param is None, (
+        "Moving a file actually means removing the old one and creating the new one.  "
+        "If we failed to move the file to the new location, we should still manage to "
+        "delete the previous one (and remove its state with it).  We don't have a new "
+        "state as there is no new file."
+    )
 
     # Delete
     delete_model = model(True)
