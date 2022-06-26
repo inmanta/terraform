@@ -18,13 +18,12 @@
 import json
 import logging
 from collections import defaultdict
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import inmanta.resources
 from inmanta.ast import OptionalValueException
 from inmanta.config import Config
-from inmanta.execute.proxy import DynamicProxy, SequenceProxy
+from inmanta.execute.proxy import DictProxy, DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
@@ -92,7 +91,7 @@ def resource_attribute_reference(
 
 def get_last_resource_parameter(
     context: Context, resource: DynamicProxy, param_id: str, cache_dict: dict[str, dict]
-) -> dict:
+) -> Union[dict, Unknown]:
     """
     Helper method to get the dict params from server or cache (if it is there).
     """
@@ -182,6 +181,9 @@ def get_resource_attribute(
         context=context,
         resource=resource,
     )
+    if isinstance(resource_state_wrapper, Unknown):
+        return resource_state_wrapper
+
     resource_state = resource_state_wrapper["state"]
     attribute_reference = resource_attribute_reference(resource, attribute_path)
     return attribute_reference.extract_from_state(resource_state)
@@ -344,21 +346,27 @@ def safe_resource_state(
     """
     current_config = resource.config
     previous_config_wrapper = get_last_resource_config(context, resource)
+    if isinstance(previous_config_wrapper, Unknown):
+        return previous_config_wrapper
+
     previous_config_tag = previous_config_wrapper["tag"]
     previous_config = previous_config_wrapper["config"]
 
     if current_config != previous_config:
         # The config has changed in this model compared to last deployment
         # the state is therefore not safe to use.
-        raise Unknown(source=resource)
+        return Unknown(source=resource)
 
     previous_state_wrapper = get_last_resource_state(context, resource)
+    if isinstance(previous_state_wrapper, Unknown):
+        return previous_state_wrapper
+
     previous_state_tag = previous_state_wrapper["tag"]
 
     if previous_config_tag != previous_state_tag:
         # The config and the state we have in cache are out of sync, it is
         # unsafe to use, so we raise an Unknown
-        raise Unknown(source=resource)
+        return Unknown(source=resource)
 
     # We can safely get the state
     return previous_config_wrapper["state"]
@@ -386,14 +394,25 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
     if config.nesting_mode == "dict":
         # Block embedded in a dict, we need to take the block at key config.key
         # in the dict
-        assert isinstance(state_container, dict)
+        if not isinstance(state_container, DictProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
+
         return state_container[config.key]
 
     if config.nesting_mode == "list":
         # Block embedded in a list, the list should be sorted using the key, and
         # we should take the element in the state_container list at the same position
         # as our config block in the global config
-        assert isinstance(state_container, list)
+        if not isinstance(state_container, SequenceProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
 
         # This is the key of our config
         config_key = config.key
@@ -402,7 +421,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
         sibling_configs = parent_config.children
 
         # These are all the config keys, sorted (the state should be sorted the same way)
-        config_keys = sorted(c.key for c in sibling_configs)
+        config_keys = sorted(c.key for c in sibling_configs if c.name == config.name)
 
         # Sanity check, the state_container should have the same length as our configs
         if not len(state_container) == len(config_keys):
@@ -419,15 +438,21 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
         # we rely on the fact that the config dict is a subset of the state dict.  We
         # check for each element in the list, which one wouldn't we changed it we
         # updated it with our config, that one should be our state.
-        assert isinstance(state_container, list)
+        if not isinstance(state_container, SequenceProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
 
         # This is our config dict, minus all the default (null) values
         clean_config = {k: v for k, v in config._config.items() if v is not None}
 
-        matching_states: list[dict] = []
+        matching_states: list[DictProxy] = []
         for candidate_state in state_container:
-            state = deepcopy(candidate_state)
-            state.update(clean_config)
+            state = {k: v for k, v in candidate_state.items()}
+            for key, value in clean_config.items():
+                state[key] = value
 
             if state == candidate_state:
                 matching_states.append(candidate_state)
@@ -451,7 +476,7 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
     config_path = []
     block = config_block
     while block is not None:
-        config_path.append(block.name)
+        config_path.append(block.name or "")
 
         try:
             block = block.parent

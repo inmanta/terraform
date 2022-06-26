@@ -38,8 +38,8 @@ def test_config_serialization(project: Project):
     model = """
         import terraform::config
 
-        terraform::config::Block(
-            name="root",
+        config = terraform::config::Block(
+            name=null,
             attributes={"name": "Albert"},
             children=[
                 terraform::config::Block(
@@ -78,12 +78,13 @@ def test_config_serialization(project: Project):
                 )
             ],
             parent=null,
+            _state=config._config,
         )
     """
     project.compile(model, no_dedent=False)
 
     blocks = project.get_instances("terraform::config::Block")
-    root_block = next(iter(block for block in blocks if block.name == "root"))
+    root_block = next(iter(block for block in blocks if block.name is None))
 
     assert root_block._config["name"] == "Albert"
     assert root_block._config["pets"] == {
@@ -114,10 +115,11 @@ def test_deprecated_config(project: Project) -> None:
         import terraform::config
 
         terraform::config::Block(
-            name="root",
+            name=null,
             attributes={},
             deprecated=true,
             parent=null,
+            _state={},
         )
     """
 
@@ -136,7 +138,7 @@ def test_deprecated_config(project: Project) -> None:
     stdout, stderr = result.communicate()
     assert result.returncode == 0, stderr
     assert stdout == (
-        "inmanta_plugins.terraformWARNING The usage of config 'root' at "
+        "inmanta_plugins.terraformWARNING The usage of config '' at "
         f"{project._test_project_dir}/main.cf:3 is deprecated\n"
     )
 
@@ -185,7 +187,7 @@ async def test_block_config(
             agent_config=prov_agent_config,
             manual_config=false,
             root_config=terraform::config::Block(
-                name="root",
+                name=null,
                 attributes={{}},
             ),
         )
@@ -199,7 +201,7 @@ async def test_block_config(
             requires=prov,
             manual_config=false,
             root_config=terraform::config::Block(
-                name="root",
+                name=null,
                 attributes={{
                     "filename": "{file_path_object}",
                     "content": "test",
