@@ -18,6 +18,7 @@
 import json
 import logging
 from collections import defaultdict
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
@@ -172,6 +173,9 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
     # For each children, we pick up the config and attach it to this dict.
     # Depending on the nesting_mode of the child, the way we attach the config will vary.
     for child in config_block.children:
+        if child.name is None:
+            raise PluginException("A child config block can not have a null name")
+
         if child.nesting_mode == "single":
             if child.name in d:
                 raise PluginException(
@@ -246,6 +250,83 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
         d[key] = dd
 
     return d
+
+
+@plugin
+def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "dict":  # type: ignore
+    """
+    Extract the state corresponding to the provided config block from the parent state.
+
+    :param state: The parent state dict, it should include our config at key config.name
+    :param config: The config block we want to find the matching config for.
+    """
+    if config.name is None:
+        raise PluginException("Can not extract the config for the root config block")
+
+    state_container = parent_state[config.name]
+
+    if config.nesting_mode == "single":
+        # Single embedded block, we can simply pick the the block in the state
+        return state_container
+
+    if config.nesting_mode == "dict":
+        # Block embedded in a dict, we need to take the block at key config.key
+        # in the dict
+        assert isinstance(state_container, dict)
+        return state_container[config.key]
+
+    if config.nesting_mode == "list":
+        # Block embedded in a list, the list should be sorted using the key, and
+        # we should take the element in the state_container list at the same position
+        # as our config block in the global config
+        assert isinstance(state_container, list)
+
+        # This is the key of our config
+        config_key = config.key
+
+        parent_config = config.parent
+        sibling_configs = parent_config.children
+
+        # These are all the config keys, sorted (the state should be sorted the same way)
+        config_keys = sorted(c.key for c in sibling_configs)
+
+        # Sanity check, the state_container should have the same length as our configs
+        if not len(state_container) == len(config_keys):
+            raise PluginException(
+                "The length of the state list doesn't match the number of config blocks there is.  "
+                f"state={state_container}, config_keys={config_keys}"
+            )
+
+        config_position = config_keys.index(config_key)
+        return state_container[config_position]
+
+    if config.nesting_mode == "set":
+        # Block embedded in a set, the matching state might be anywhere.  To find it,
+        # we rely on the fact that the config dict is a subset of the state dict.  We
+        # check for each element in the list, which one wouldn't we changed it we
+        # updated it with our config, that one should be our state.
+        assert isinstance(state_container, list)
+
+        # This is our config dict, minus all the default (null) values
+        clean_config = {k: v for k, v in config._config.items() if v is not None}
+
+        matching_states: list[dict] = []
+        for candidate_state in state_container:
+            state = deepcopy(candidate_state)
+            state.update(clean_config)
+
+            if state == candidate_state:
+                matching_states.append(candidate_state)
+
+        if len(matching_states) != 1:
+            raise PluginException(
+                f"Failed to find a unique matching state in the list {state_container} for config "
+                f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
+            )
+
+        return matching_states[0]
+
+    raise PluginException(f"Unknown nesting mode: {config.nesting_mode}")
 
 
 @plugin
