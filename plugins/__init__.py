@@ -29,18 +29,28 @@ from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
-from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
+from inmanta_plugins.terraform.helpers.const import (
+    TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+    TERRAFORM_RESOURCE_STATE_PARAMETER,
+)
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 
-# This dict contains all resource parameter already queried for this compile run.
+# This dict contains all resource state parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
-resource_states: Dict[str, Dict] = dict()
+resource_states: dict[str, dict] = dict()
+
+# This dict contains all resource config parameters already queried for this compile run.
+# This avoids getting them multiple times if multiple entities use them.
+resource_configs: dict[str, dict] = dict()
 
 
 def inmanta_reset_state() -> None:
-    # Resetting the resource states dict between compiles
+    # Resetting the resource states and configs dict between compiles
     global resource_states
     resource_states = dict()
+
+    global resource_configs
+    resource_configs = dict()
 
 
 def resource_attribute_reference(
@@ -253,9 +263,84 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
 
 @plugin
+def get_last_resource_config(
+    context: Context,
+    resource: "terraform::Resource",  # type: ignore
+) -> "dict":
+    """
+    Get the last version of the config of a resource.  This is the version which
+    got deployed in the latest deployment of the resource.  It is in sync with
+    the resource state.
+    """
+    global resource_configs
+
+    resource_id = inmanta.resources.to_id(resource)
+
+    cached_config = resource_configs.get(resource_id)
+    if cached_config is not None:
+        return cached_config
+
+    environment = Config.get("config", "environment", None)
+    if environment is None:
+        raise PluginException(
+            "The environment for this model should be configured at this point"
+        )
+
+    # Cache miss, we continue
+    param_client = ParamClient(
+        environment=environment,
+        client=context.get_client(),
+        run_sync=lambda func: context.run_sync(func),  # type: ignore
+        param_id=TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+        resource_id=resource_id,
+    )
+
+    resource_config_raw: Optional[str] = param_client.get()
+    if resource_config_raw is None:
+        unknown_parameters.append(
+            {
+                "resource": resource_id,
+                "parameter": TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+                "source": "fact",
+            }
+        )
+        return Unknown(source=resource)
+
+    resource_config = json.loads(resource_config_raw)
+    resource_states.setdefault(resource_id, resource_config)
+
+    return resource_config
+
+
+@plugin
+def safe_resource_state(
+    context: Context,
+    resource: "terraform::Resource",  # type: ignore
+) -> "dict":
+    """
+    Get the state dict of a resource and check whether the current config of
+    the resource has changed since the state was published.  If this is the
+    case, raise an Unknown value, as the state is out of sync and is dangerous
+    to use.
+    """
+    current_config = resource.config
+    previous_config = get_last_resource_config(context, resource)
+
+    if current_config == previous_config:
+        # We can safely get the state
+        return get_resource_attribute(context, resource, SequenceProxy([]))
+
+    # The config has changed in this model compared to last deployment
+    # the state is therefore not safe to use.
+    raise Unknown(source=resource)
+
+
+@plugin
 def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "dict":  # type: ignore
     """
     Extract the state corresponding to the provided config block from the parent state.
+    This method should only be used with a state originating from the safe_resource_state
+    plugin.
 
     :param state: The parent state dict, it should include our config at key config.name
     :param config: The config block we want to find the matching config for.

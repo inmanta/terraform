@@ -56,6 +56,11 @@ entity Block:
         the element in the dict named after the name of this block.
     :attr key: The key, required for list and dict nesting mode, ignored otherwise.
     :attr _config: Generated, the serialized version of this config.
+    :attr _state: Generated, the current state for the resource attached to this config
+        block.  The state here matches the same element as this config block.
+        (The config should be a subset of the state if there is not change between last
+        compile config and current compile config, in which case the config will still
+        be unknown).
 
     i.e. The following configuration structure can be constructed with entities.
 

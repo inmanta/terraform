@@ -19,4 +19,5 @@
 """
 
 TERRAFORM_RESOURCE_STATE_PARAMETER = "terraform-resource-state"
+TERRAFORM_RESOURCE_CONFIG_PARAMETER = "terraform-resource-config"
 INMANTA_MAGIC_KEY = "inmanta_magic_key"

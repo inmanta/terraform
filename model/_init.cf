@@ -134,7 +134,7 @@ implementation resourceConfig for Resource:
         self.root_config.name = null
 
         # Get the state from parameter and attach it to the config block
-        self.root_config._state = get_resource_attribute(self, [])
+        self.root_config._state = safe_resource_state(self)
 
         self.config = self.root_config._config
     end
