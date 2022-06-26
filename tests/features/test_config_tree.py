@@ -27,7 +27,6 @@ from helpers.utils import deploy_model
 from pytest_inmanta.plugin import Project
 
 from inmanta.agent.agent import Agent
-from inmanta.const import VersionState
 from inmanta.protocol.endpoints import Client
 from inmanta.server.protocol import Server
 
@@ -163,7 +162,9 @@ async def test_block_config(
         agent_names=["hashicorp-local-2.1.0"],
     )
 
-    file_path_object = Path(function_temp_dir) / Path("test-file.txt")
+    file_path_object_1 = Path(function_temp_dir) / Path("test-file-1.txt")
+    file_path_object_2 = Path(function_temp_dir) / Path("test-file-2.txt")
+    file_path_object_3 = Path(function_temp_dir) / Path("test-file-3.txt")
 
     model = f"""
         import terraform
@@ -192,9 +193,9 @@ async def test_block_config(
             ),
         )
 
-        res = terraform::Resource(
+        res_1 = terraform::Resource(
             type="local_file",
-            name="test",
+            name="test1",
             purged=false,
             send_event=true,
             provider=prov,
@@ -203,19 +204,72 @@ async def test_block_config(
             root_config=terraform::config::Block(
                 name=null,
                 attributes={{
-                    "filename": "{file_path_object}",
+                    "filename": "{file_path_object_1}",
                     "content": "test",
                 }},
             ),
         )
+        res_1_id = terraform::get_from_unknown_dict(res_1.root_config._state, "id")
+
+        res_2 = terraform::Resource(
+            type="local_file",
+            name="test2",
+            purged=false,
+            send_event=true,
+            provider=prov,
+            requires=prov,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name=null,
+                attributes={{
+                    "filename": "{file_path_object_2}",
+                    "content": "res_1.id={{{{ res_1_id }}}}",
+                }},
+            ),
+        )
+        res_2_id = terraform::get_from_unknown_dict(res_2.root_config._state, "id")
+
+        res_3 = terraform::Resource(
+            type="local_file",
+            name="test3",
+            purged=false,
+            send_event=true,
+            provider=prov,
+            requires=prov,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name=null,
+                attributes={{
+                    "filename": "{file_path_object_3}",
+                    "content": "res_2.id={{{{ res_2_id }}}}",
+                }},
+            ),
+        )
+        res_3_id = terraform::get_from_unknown_dict(res_3.root_config._state, "id")
     """
 
-    assert not file_path_object.exists()
+    assert not file_path_object_1.exists()
+    assert not file_path_object_2.exists()
+    assert not file_path_object_3.exists()
 
     # Create
-    assert (
-        await deploy_model(project, model, client, environment) == VersionState.success
-    )
+    await deploy_model(project, model, client, environment)
 
-    assert file_path_object.exists()
-    assert file_path_object.read_text("utf-8") == "test"
+    assert file_path_object_1.exists()
+    assert file_path_object_1.read_text("utf-8") == "test"
+    assert not file_path_object_2.exists()
+    assert not file_path_object_3.exists()
+
+    # Create next file (now that the id of the first exists)
+    await deploy_model(project, model, client, environment)
+
+    assert file_path_object_1.exists()
+    assert file_path_object_2.exists()
+    assert not file_path_object_3.exists()
+
+    # Create next file (now that the id of the second exists)
+    await deploy_model(project, model, client, environment)
+
+    assert file_path_object_1.exists()
+    assert file_path_object_2.exists()
+    assert file_path_object_3.exists()

@@ -307,6 +307,7 @@ class TerraformResourceHandler(CRUDHandler):
             "tag": self.deployment_tag,
             "config": resource.resource_config,
         }
+        ctx.debug("Saving resource config to params", **config_param)
         param_client.set(json.dumps(config_param))
 
     def read_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:

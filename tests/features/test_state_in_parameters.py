@@ -15,6 +15,7 @@
 
     Contact: code@inmanta.com
 """
+import json
 import logging
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -70,6 +71,7 @@ async def test_store(
     cache_agent_dir: str,
 ):
     from inmanta_plugins.terraform.helpers.const import (
+        TERRAFORM_RESOURCE_CONFIG_PARAMETER,
         TERRAFORM_RESOURCE_STATE_PARAMETER,
     )
 
@@ -112,7 +114,7 @@ async def test_store(
 
     resource_id = Id.resource_str(resource.id)
 
-    async def get_param_short() -> Optional[str]:
+    async def get_state_param_short() -> Optional[str]:
         return await get_param(
             environment=environment,
             client=client,
@@ -120,16 +122,33 @@ async def test_store(
             resource_id=resource_id,
         )
 
+    async def get_config_param_short() -> Optional[str]:
+        return await get_param(
+            environment=environment,
+            client=client,
+            param_id=TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+            resource_id=resource_id,
+        )
+
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "There shouldn't be any state set at this point for this resource"
+    assert (
+        await get_config_param_short() is None
+    ), "There shouldn't be any config set at this point for this resource"
 
     assert (
         await deploy_model(project, create_model, client, environment)
         == VersionState.success
     )
 
-    assert await get_param_short() is not None, "A state should have been set by now"
+    state = await get_state_param_short()
+    assert state is not None, "A state should have been set by now"
+
+    config = await get_config_param_short()
+    assert config is not None, "A config should have been set by now"
+
+    assert json.loads(state)["tag"] == json.loads(config)["tag"]
 
     # Delete
     delete_model = model(True)
@@ -140,7 +159,7 @@ async def test_store(
     )
 
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "The state should have been removed, but wasn't"
 
 
@@ -202,7 +221,7 @@ async def test_create_failed(
 
     resource_id = Id.resource_str(resource.id)
 
-    async def get_param_short() -> Optional[str]:
+    async def get_state_param_short() -> Optional[str]:
         return await get_param(
             environment=environment,
             client=client,
@@ -211,7 +230,7 @@ async def test_create_failed(
         )
 
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "There shouldn't be any state set at this point for this resource"
 
     assert (
@@ -220,7 +239,7 @@ async def test_create_failed(
     )
     assert not file_path_object.exists()
 
-    param = await get_param_short()
+    param = await get_state_param_short()
     assert param is not None, "A state should have been set by now"
     assert param == "null", "The file isn't deployed, his state is null"
 
@@ -233,7 +252,7 @@ async def test_create_failed(
     )
 
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "The state should have been removed, but wasn't"
 
     assert not file_path_object.exists()
@@ -298,7 +317,7 @@ async def test_update_failed(
 
     resource_id = Id.resource_str(resource.id)
 
-    async def get_param_short() -> Optional[str]:
+    async def get_state_param_short() -> Optional[str]:
         return await get_param(
             environment=environment,
             client=client,
@@ -307,7 +326,7 @@ async def test_update_failed(
         )
 
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "There shouldn't be any state set at this point for this resource"
 
     assert (
@@ -315,7 +334,9 @@ async def test_update_failed(
         == VersionState.success
     )
 
-    assert await get_param_short() is not None, "A state should have been set by now"
+    assert (
+        await get_state_param_short() is not None
+    ), "A state should have been set by now"
 
     # Update
     forbidden_path_object = Path("/dev/test-file.txt")
@@ -326,7 +347,7 @@ async def test_update_failed(
         await deploy_model(project, update_model, client, environment)
         == VersionState.failed
     )
-    param = await get_param_short()
+    param = await get_state_param_short()
     assert param is not None, "The state should still be there"
     assert param == "null", "The state should be empty as the new file couldn't deploy"
 
@@ -339,5 +360,5 @@ async def test_update_failed(
     )
 
     assert (
-        await get_param_short() is None
+        await get_state_param_short() is None
     ), "The state should have been removed, but wasn't"
