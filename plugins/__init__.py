@@ -31,6 +31,9 @@ from inmanta_plugins.terraform.helpers.attribute_reference import AttributeRefer
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 
+LOGGER = logging.getLogger(__name__)
+
+
 # This dict contains all resource parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
 resource_states: Dict[str, Dict] = dict()
@@ -126,7 +129,7 @@ def get_resource_attribute(
     resource_state = json.loads(resource_state_raw)
     if resource_state is None:
         # This should not happen, a resource can not have a null state
-        logging.getLogger(__name__).warning(
+        LOGGER.warning(
             f"The state of resource {attribute_reference.resource_id} is null, this is not supposed to happen"
         )
         unknown_parameters.append(
@@ -279,6 +282,6 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
     config_path_str = ".".join(reversed(config_path))
 
-    logging.getLogger(__name__).warning(
+    LOGGER.warning(
         f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
     )
