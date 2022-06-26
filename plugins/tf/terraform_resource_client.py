@@ -37,7 +37,10 @@ will work.
 import msgpack  # type: ignore
 
 from inmanta_plugins.terraform.helpers.utils import fill_partial_state
-from inmanta_plugins.terraform.tf.exceptions import PluginException
+from inmanta_plugins.terraform.tf.exceptions import (
+    PluginException,
+    PluginResponseException,
+)
 from inmanta_plugins.terraform.tf.terraform_provider import (
     TerraformProvider,
     raise_for_diagnostics,
@@ -94,6 +97,12 @@ class TerraformResourceClient:
         return self.provider.schema.resource_schemas.get(self.resource_state.type_name)
 
     def import_resource(self, id: str) -> Optional[dict]:
+        """
+        Import the resource.  This will, based on the resource id, get enough of the
+        config so that a read operation can work.
+
+        :param id: The identifier of the resource, as the provider would know it.
+        """
         if (
             self.resource_state.state is not None
             and self.resource_state.state.get("id") != id
@@ -122,14 +131,25 @@ class TerraformResourceClient:
                 f"got {len(imported)} (expected 1)"
             )
 
-        self.resource_state.state = parse_response(
-            msgpack.unpackb(imported[0].state.msgpack)
-        )
         self.resource_state.private = imported[0].private
+
+        # Sanity check, the new state here should never be none
+        new_state = parse_response(msgpack.unpackb(imported[0].state.msgpack))
+        if new_state is not None:
+            self.resource_state.state = new_state
+        else:
+            raise PluginResponseException(
+                "Invalid response from provider for ImportResourceState when importing resource.  "
+                "Received null state, this can not happen."
+            )
 
         return self.resource_state.state
 
     def read_resource(self) -> Optional[dict]:
+        """
+        Read the resource current state.  The returned dict contains the current
+        state of the resource.  The state object is also updated.
+        """
         if self.resource_state.state is None:
             return None
 
@@ -149,10 +169,17 @@ class TerraformResourceClient:
 
         raise_for_diagnostics(result.diagnostics, "Failed to read the resource")
 
-        self.resource_state.state = parse_response(
-            msgpack.unpackb(result.new_state.msgpack)
-        )
         self.resource_state.private = result.private
+
+        # Sanity check, the new state here should never be none
+        new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
+        if new_state is not None:
+            self.resource_state.state = new_state
+        else:
+            raise PluginResponseException(
+                "Invalid response from provider for ResourceChange when reading resource.  "
+                "Received null state, this can not happen."
+            )
 
         self.logger.info(
             f"Read resource with state: {json.dumps(self.resource_state.state, indent=2)}"
@@ -161,6 +188,12 @@ class TerraformResourceClient:
         return self.resource_state.state
 
     def create_resource(self, desired: dict) -> Optional[dict]:
+        """
+        Create the resource, using the provided desired dict.  The returned dict contains
+        the new state for the resource.  The state object is also updated.
+
+        :param desired: The desired state for the resource.
+        """
         base_conf = fill_partial_state(desired, self.resource_schema.block)
 
         # Plan
@@ -196,9 +229,16 @@ class TerraformResourceClient:
         self.logger.debug(f"Create resource response: {str(result)}")
 
         self.resource_state.private = result.private
-        self.resource_state.state = parse_response(
-            msgpack.unpackb(result.new_state.msgpack)
-        )
+
+        # Here we check if the new state is none as in the event of an error, the
+        # returned state should be the most recent known state of the resource,
+        # if it exists.  In this case, given that the resource doesn't exist, this
+        # state might be none, we should then not store it in the resource state.
+        new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
+        if new_state is not None:
+            self.resource_state.state = new_state
+        else:
+            self.logger.warning("Null state received from provider")
 
         raise_for_diagnostics(result.diagnostics, "Failed to create the resource")
 
@@ -209,7 +249,12 @@ class TerraformResourceClient:
         Perform an update (or a replace if required) of the specified resource.
         The following document's comments were a great help in the process of wiring this
         all up.
-        https://github.com/hashicorp/terraform/blob/main/providers/provider.go
+        https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go
+
+        The returned dict is the updated state of the resource.  The state object is
+        also updated.
+
+        :param desired: The desired state for the resource.
         """
         self.resource_state.raise_if_not_complete()
 
@@ -266,16 +311,31 @@ class TerraformResourceClient:
 
         self.logger.debug(f"Update resource response: {str(result)}")
 
-        self.resource_state.state = parse_response(
-            msgpack.unpackb(result.new_state.msgpack)
-        )
         self.resource_state.private = result.private
 
+        # Here we check if the new state is none as in the event of an error, the
+        # returned state should be the most recent known state of the resource,
+        # if it exists.  In this case, given that the resource should exist, we
+        # will fail if the state is none (after the potential error raised by
+        # the diagnostics)
+        new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
+        if new_state is not None:
+            self.resource_state.state = new_state
+
         raise_for_diagnostics(result.diagnostics, "Failed to update the resource")
+
+        if new_state is None:
+            raise PluginResponseException(
+                "Invalid response from provider for ApplyResourceChange when updating resource.  "
+                "Received null state, this can not happen."
+            )
 
         return self.resource_state.state
 
     def delete_resource(self) -> None:
+        """
+        Delete the resource and wipe any trace of its existence in the state object.
+        """
         self.resource_state.raise_if_not_complete()
 
         # Plan
