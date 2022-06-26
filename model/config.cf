@@ -43,6 +43,7 @@ entity Block:
 
 
     :attr name: The name of this config section in the parent config block.
+        Should be left null for the root config block.
     :attr attributes: A dictionary of attributes.  The key is the attribute name
         as specified in the terraform provider schema.  The value is the value
         assigned to this attribute in the corresponding inmanta entity.
@@ -61,7 +62,7 @@ entity Block:
         .. code-block::
 
             terraform::config::Block(
-                name="root",
+                name=null,
                 attributes={"name": "Albert"},
                 children=[
                     terraform::config::Block(
@@ -94,6 +95,7 @@ entity Block:
                     )
                 ],
                 parent=null,
+                state=get_resource_attribute(terraform_resource, []),
             )
 
         It will be serialized as follows (the order of the children list might differ):
@@ -123,7 +125,7 @@ entity Block:
                 ],
             }
     """
-    string name
+    string? name = null
     dict attributes
     bool deprecated = false
 
@@ -131,6 +133,7 @@ entity Block:
     string? key = null
 
     dict _config
+    dict _state
 end
 
 
@@ -145,6 +148,16 @@ implementation serialize for Block:
 end
 
 
+implementation build_state for Block:
+    """
+    Extract the state matching this block from the parent state.
+    This should only be called on non-root blocks.  The root block
+    should get the config from the resource parameter storing it.
+    """
+    self._state = extract_state(self.parent._state, self)
+end
+
+
 implementation deprecation_warning for Block:
     """
     Send a warning that the usage of this block is deprecated
@@ -154,4 +167,5 @@ end
 
 
 implement Block using serialize
+implement Block using build_state when self.name is defined
 implement Block using deprecation_warning when self.deprecated
