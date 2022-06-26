@@ -38,6 +38,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         *,
         private_file_path: str,
         param_client: ParamClient,
+        tag: str,
         private: Optional[bytes] = None,
         state: Optional[dict] = None,
     ) -> None:
@@ -47,6 +48,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             to store the private value of the resource.
         :attr param_client: A client that can be used to store the resource state in
             the orchestrator parameters.
+        :attr tag: A tag to mark this state.  It will be set alongside the state dict.
         :attr private: An initial private value for this resource
         :attr state: An initial state for this resource
         """
@@ -56,6 +58,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             private=private,
             state=state,
         )
+        self.tag = tag
         self._private_file_path = Path(private_file_path)
         self._param_client = param_client
 
@@ -82,7 +85,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         if self._state is None:
             param_value = self._param_client.get()
             if param_value is not None:
-                self._state = json.loads(param_value)
+                self._state = json.loads(param_value)["state"]
 
         return self._state
 
@@ -102,7 +105,12 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         Every time a new value for the state is set, we save it in the parameter corresponding to it. And update
         the cached value.
         """
-        self._param_client.set(json.dumps(value))
+        state_dict = {
+            "tag": self.tag,
+            "state": value,
+        }
+
+        self._param_client.set(json.dumps(state_dict))
 
         self._state = value
 

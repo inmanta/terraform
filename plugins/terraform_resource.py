@@ -20,6 +20,7 @@ import copy
 import json
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -29,7 +30,10 @@ from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, p
 from inmanta.agent.io.local import IOBase
 from inmanta.protocol.endpoints import Client
 from inmanta.resources import Id, PurgeableResource, resource
-from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
+from inmanta_plugins.terraform.helpers.const import (
+    TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+    TERRAFORM_RESOURCE_STATE_PARAMETER,
+)
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (
     build_resource_state,
@@ -113,6 +117,7 @@ class TerraformResourceHandler(CRUDHandler):
         self._resource_client: Optional[TerraformResourceClient] = None
         self.log_file_path = ""
         self.private_file_path = ""
+        self.deployment_tag = str(uuid.uuid4())
 
     @property
     def resource_client(self) -> TerraformResourceClient:
@@ -199,6 +204,8 @@ class TerraformResourceHandler(CRUDHandler):
          - Ensure we have a state file
          - Start the provider process
         """
+        self.deployment_tag = str(uuid.uuid4())
+
         provider_installer = ProviderInstaller(
             namespace=resource.provider_namespace,
             type=resource.provider_type,
@@ -250,6 +257,7 @@ class TerraformResourceHandler(CRUDHandler):
             type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
+            tag=self.deployment_tag,
         )
 
         self.provider = TerraformProvider(
@@ -286,6 +294,20 @@ class TerraformResourceHandler(CRUDHandler):
                 ctx.debug("Provider logs", logs="".join(lines))
 
         Path(self.log_file_path).unlink()
+
+        # Save the config used for this deployment in a parameter
+        param_client = ParamClient(
+            str(self._agent.environment),
+            Client("agent"),
+            lambda func: self.run_sync(func),
+            TERRAFORM_RESOURCE_CONFIG_PARAMETER,
+            Id.resource_str(resource.id),
+        )
+        config_param = {
+            "tag": self.deployment_tag,
+            "config": resource.resource_config,
+        }
+        param_client.set(json.dumps(config_param))
 
     def read_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """

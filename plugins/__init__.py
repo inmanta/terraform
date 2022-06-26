@@ -90,6 +90,75 @@ def resource_attribute_reference(
     )
 
 
+def get_last_resource_parameter(
+    context: Context, resource: DynamicProxy, param_id: str, cache_dict: dict[str, dict]
+) -> dict:
+    """
+    Helper method to get the dict params from server or cache (if it is there).
+    """
+    resource_id = inmanta.resources.to_id(resource)
+
+    cached_parameter_dict = cache_dict.get(resource_id)
+    if cached_parameter_dict is not None:
+        return cached_parameter_dict
+
+    environment = Config.get("config", "environment", None)
+    if environment is None:
+        raise PluginException(
+            "The environment for this model should be configured at this point"
+        )
+
+    # Cache miss, we continue
+    param_client = ParamClient(
+        environment=environment,
+        client=context.get_client(),
+        run_sync=lambda func: context.run_sync(func),  # type: ignore
+        param_id=param_id,
+        resource_id=resource_id,
+    )
+
+    resource_config_raw: Optional[str] = param_client.get()
+    if resource_config_raw is None:
+        unknown_parameters.append(
+            {
+                "resource": resource_id,
+                "parameter": param_id,
+                "source": "fact",
+            }
+        )
+        return Unknown(source=resource)
+
+    resource_parameter_dict = json.loads(resource_config_raw)
+    cache_dict.setdefault(resource_id, resource_parameter_dict)
+
+    return resource_parameter_dict
+
+
+@plugin
+def get_last_resource_state(
+    context: Context,
+    resource: "terraform::Resource",  # type: ignore
+) -> "dict":
+    """
+    Get the last version of the state of a resource.  This is the version which
+    got deployed in the latest deployment of the resource.  It is in sync with
+    the resource config.
+
+    The returned dict has two keys:
+      - "tag": A tag which should match the tag of the config dict that was used
+        in the same deployment this state was produced.
+      - "state": The actual state dict
+    """
+    global resource_states
+
+    return get_last_resource_parameter(
+        context=context,
+        resource=resource,
+        param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
+        cache_dict=resource_states,
+    )
+
+
 @plugin
 def get_resource_attribute(
     context: Context,
@@ -98,49 +167,24 @@ def get_resource_attribute(
 ) -> "any":  # type: ignore
     """
     Get a resource attribute from the saved parameters (facts).
+
+    Disclaimer: Whatever comes out of this method might not be very safe to use,
+        as it might be out of sync with the current state of the model.
+        i.e. If you access here the id of a file, which is modified in the same
+            model, the id you will receive will be the one of the previous file
+            not the one deployed in this model.
+        It is safer to use safe_resource_state plugin.
+
     :param resource: The resource we which to get an attribute from.
     :param attribute_path: The path, in the resource state dict, to the desired value.
     """
-    global resource_states
-
-    attribute_reference = resource_attribute_reference(resource, attribute_path)
-
-    # Trying to get resource value from cache to avoid unnecessary api calls
-    cached_state = resource_states.get(attribute_reference.resource_id)
-    if cached_state is not None:
-        # Cache hit, we get the attribute value and return it
-        try:
-            return attribute_reference.extract_from_state(cached_state)
-        except ValueError as e:
-            raise PluginException(str(e))
-
-    # Cache miss, we continue
-    param_client = ParamClient(
-        environment=attribute_reference.environment,
-        client=context.get_client(),
-        run_sync=lambda func: context.run_sync(func),  # type: ignore
-        param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
-        resource_id=attribute_reference.resource_id,
+    resource_state_wrapper = get_last_resource_state(
+        context=context,
+        resource=resource,
     )
-
-    resource_state_raw: Optional[str] = param_client.get()
-    if resource_state_raw is None:
-        unknown_parameters.append(
-            {
-                "resource": attribute_reference.resource_id,
-                "parameter": TERRAFORM_RESOURCE_STATE_PARAMETER,
-                "source": "fact",
-            }
-        )
-        return Unknown(source=resource)
-
-    resource_state = json.loads(resource_state_raw)
-    resource_states.setdefault(attribute_reference.resource_id, resource_state)
-
-    try:
-        return attribute_reference.extract_from_state(resource_state)
-    except ValueError as e:
-        raise PluginException(str(e))
+    resource_state = resource_state_wrapper["state"]
+    attribute_reference = resource_attribute_reference(resource, attribute_path)
+    return attribute_reference.extract_from_state(resource_state)
 
 
 @plugin
@@ -271,45 +315,20 @@ def get_last_resource_config(
     Get the last version of the config of a resource.  This is the version which
     got deployed in the latest deployment of the resource.  It is in sync with
     the resource state.
+
+    The returned dict has two keys:
+      - "tag": A tag which should match the tag of the state dict that was produced
+        in the same deployment this config was used.
+      - "config": The actual config dict
     """
     global resource_configs
 
-    resource_id = inmanta.resources.to_id(resource)
-
-    cached_config = resource_configs.get(resource_id)
-    if cached_config is not None:
-        return cached_config
-
-    environment = Config.get("config", "environment", None)
-    if environment is None:
-        raise PluginException(
-            "The environment for this model should be configured at this point"
-        )
-
-    # Cache miss, we continue
-    param_client = ParamClient(
-        environment=environment,
-        client=context.get_client(),
-        run_sync=lambda func: context.run_sync(func),  # type: ignore
+    return get_last_resource_parameter(
+        context=context,
+        resource=resource,
         param_id=TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-        resource_id=resource_id,
+        cache_dict=resource_configs,
     )
-
-    resource_config_raw: Optional[str] = param_client.get()
-    if resource_config_raw is None:
-        unknown_parameters.append(
-            {
-                "resource": resource_id,
-                "parameter": TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-                "source": "fact",
-            }
-        )
-        return Unknown(source=resource)
-
-    resource_config = json.loads(resource_config_raw)
-    resource_states.setdefault(resource_id, resource_config)
-
-    return resource_config
 
 
 @plugin
@@ -324,15 +343,25 @@ def safe_resource_state(
     to use.
     """
     current_config = resource.config
-    previous_config = get_last_resource_config(context, resource)
+    previous_config_wrapper = get_last_resource_config(context, resource)
+    previous_config_tag = previous_config_wrapper["tag"]
+    previous_config = previous_config_wrapper["config"]
 
-    if current_config == previous_config:
-        # We can safely get the state
-        return get_resource_attribute(context, resource, SequenceProxy([]))
+    if current_config != previous_config:
+        # The config has changed in this model compared to last deployment
+        # the state is therefore not safe to use.
+        raise Unknown(source=resource)
 
-    # The config has changed in this model compared to last deployment
-    # the state is therefore not safe to use.
-    raise Unknown(source=resource)
+    previous_state_wrapper = get_last_resource_state(context, resource)
+    previous_state_tag = previous_state_wrapper["tag"]
+
+    if previous_config_tag != previous_state_tag:
+        # The config and the state we have in cache are out of sync, it is
+        # unsafe to use, so we raise an Unknown
+        raise Unknown(source=resource)
+
+    # We can safely get the state
+    return previous_config_wrapper["state"]
 
 
 @plugin
