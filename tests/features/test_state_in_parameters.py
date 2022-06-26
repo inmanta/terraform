@@ -221,8 +221,7 @@ async def test_create_failed(
     assert not file_path_object.exists()
 
     param = await get_param_short()
-    assert param is not None, "A state should have been set by now"
-    assert param == "null", "The file isn't deployed, his state is null"
+    assert param is None, "A null state should not be deployed"
 
     # Delete
     delete_model = model(True)
@@ -315,7 +314,8 @@ async def test_update_failed(
         == VersionState.success
     )
 
-    assert await get_param_short() is not None, "A state should have been set by now"
+    param = await get_param_short()
+    assert param is not None, "A state should have been set by now"
 
     # Update
     forbidden_path_object = Path("/dev/test-file.txt")
@@ -326,9 +326,13 @@ async def test_update_failed(
         await deploy_model(project, update_model, client, environment)
         == VersionState.failed
     )
+
+    previous_param = param
     param = await get_param_short()
     assert param is not None, "The state should still be there"
-    assert param == "null", "The state should be empty as the new file couldn't deploy"
+    assert (
+        param == previous_param
+    ), "The update failed, the current state should be the same"
 
     # Delete
     delete_model = model(True)
