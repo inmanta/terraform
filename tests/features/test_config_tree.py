@@ -135,10 +135,17 @@ def test_deprecated_config(project: Project) -> None:
     )
     stdout, stderr = result.communicate()
     assert result.returncode == 0, stderr
-    assert stdout == (
-        "inmanta_plugins.terraformWARNING The usage of config 'root' at "
-        f"{project._test_project_dir}/main.cf:3 is deprecated\n"
-    )
+    assert stdout in [
+        (
+            "inmanta_plugins.terraformWARNING The usage of config 'root' at "
+            f"{project._test_project_dir}/main.cf:3 is deprecated\n"
+        ),
+        (
+            # prior to https://github.com/inmanta/inmanta-core/commit/64798acc8abcc3b7b31ab657f1d04e1974209d6f
+            "inmanta_plugins.terraformWARNING The usage of config 'root' at "
+            "./main.cf:3 is deprecated\n"
+        ),
+    ]
 
 
 @pytest.mark.terraform_provider_local
