@@ -127,20 +127,6 @@ def get_resource_attribute(
         return Unknown(source=resource)
 
     resource_state = json.loads(resource_state_raw)
-    if resource_state is None:
-        # This should not happen, a resource can not have a null state
-        LOGGER.warning(
-            f"The state of resource {attribute_reference.resource_id} is null, this is not supposed to happen"
-        )
-        unknown_parameters.append(
-            {
-                "resource": attribute_reference.resource_id,
-                "parameter": TERRAFORM_RESOURCE_STATE_PARAMETER,
-                "source": "fact",
-            }
-        )
-        return Unknown(source=resource)
-
     resource_states.setdefault(attribute_reference.resource_id, resource_state)
 
     try:
