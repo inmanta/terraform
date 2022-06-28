@@ -133,14 +133,16 @@ class TerraformResourceClient:
 
         self.resource_state.private = imported[0].private
 
-        # Sanity check, the new state here should never be none
+        # Sanity check, the new state here should never be none, as this is not enough
+        # information to identify the resource
+        # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L312
         new_state = parse_response(msgpack.unpackb(imported[0].state.msgpack))
         if new_state is not None:
             self.resource_state.state = new_state
         else:
             raise PluginResponseException(
                 "Invalid response from provider for ImportResourceState when importing resource.  "
-                "Received null state, this can not happen."
+                "Received null state, this MUST NOT not happen."
             )
 
         return self.resource_state.state
@@ -171,14 +173,17 @@ class TerraformResourceClient:
 
         self.resource_state.private = result.private
 
-        # Sanity check, the new state here should never be none
+        # Sanity check, the new state here should never be none as it should contain
+        # the current state of the resource.  This state is based upon the information
+        # we provide in the call, which is already more complete than None
+        # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L189
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
         if new_state is not None:
             self.resource_state.state = new_state
         else:
             raise PluginResponseException(
                 "Invalid response from provider for ResourceChange when reading resource.  "
-                "Received null state, this can not happen."
+                "Received null state, this MUST NOT not happen."
             )
 
         self.logger.info(
@@ -324,10 +329,14 @@ class TerraformResourceClient:
 
         raise_for_diagnostics(result.diagnostics, "Failed to update the resource")
 
+        # The new state must not be None, as it should show the state of the resource
+        # after the update succeeded (if it failed, an error is raised before in
+        # raise_for_diagnostics).  None can not be the new state of the resource.
+        # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L283
         if new_state is None:
             raise PluginResponseException(
                 "Invalid response from provider for ApplyResourceChange when updating resource.  "
-                "Received null state, this can not happen."
+                "Received null state, this MUST NOT happen."
             )
 
         return self.resource_state.state
