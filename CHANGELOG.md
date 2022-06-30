@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1 - 30/06/2022
+- Fix issue with null states (#47)
+
 ## 1.2.0 - 20/06/2022
 - Add support for model based config entity tree (for generated modules).
 
