@@ -42,7 +42,7 @@ entity Provider:
     dict config
     bool manual_config = true
 
-    bool auto_agent=true
+    bool auto_agent = true
 end
 
 Provider.agent_config [1] -- std::AgentConfig
