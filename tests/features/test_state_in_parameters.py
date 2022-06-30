@@ -22,7 +22,7 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model
+from helpers.utils import deploy_model, get_param
 from providers.local.helpers.local_file import LocalFile
 from providers.local.helpers.local_provider import LocalProvider
 from pytest_inmanta.plugin import Project
@@ -34,28 +34,6 @@ from inmanta.resources import Id, Resource
 from inmanta.server.protocol import Server
 
 LOGGER = logging.getLogger(__name__)
-
-
-async def get_param(
-    environment: str, client: Client, param_id: str, resource_id: str
-) -> Optional[str]:
-    result = await client.get_param(
-        tid=environment,
-        id=param_id,
-        resource_id=resource_id,
-    )
-    if result.code == 200:
-        return result.result["parameter"]["value"]
-
-    if result.code == 404:
-        return None
-
-    if result.code == 503:
-        # In our specific case, we might get a 503 if the parameter is not set yet
-        # https://github.com/inmanta/inmanta-core/blob/5bfe60683f7e21657794eaf222f43e4c53540bb5/src/inmanta/server/agentmanager.py#L799
-        return None
-
-    assert False, f"Unexpected response from server: {result.code}, {result.message}"
 
 
 @pytest.mark.terraform_provider_local
