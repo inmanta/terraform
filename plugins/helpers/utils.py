@@ -15,6 +15,7 @@
 
     Contact: code@inmanta.com
 """
+import hashlib
 import json
 from typing import Any, Dict
 
@@ -202,3 +203,12 @@ def build_resource_state(
         }
 
     return desired_state
+
+
+def dict_hash(input: dict) -> str:
+    """
+    Take a dict as argument and compute a hash for that dict.
+    """
+    s = json.dumps(input, sort_keys=True)
+    hash_obj = hashlib.md5(s.encode("utf-8"))
+    return hash_obj.hexdigest()

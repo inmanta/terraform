@@ -27,11 +27,9 @@ from inmanta.execute.proxy import DictProxy, DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
+from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
-from inmanta_plugins.terraform.helpers.const import (
-    TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-    TERRAFORM_RESOURCE_STATE_PARAMETER,
-)
+from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 
 LOGGER = logging.getLogger(__name__)
@@ -312,31 +310,6 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
 
 @plugin
-def get_last_resource_config(
-    context: Context,
-    resource: "terraform::Resource",  # type: ignore
-) -> "dict":
-    """
-    Get the last version of the config of a resource.  This is the version which
-    got deployed in the latest deployment of the resource.  It is in sync with
-    the resource state.
-
-    The returned dict has two keys:
-      - "tag": A tag which should match the tag of the state dict that was produced
-        in the same deployment this config was used.
-      - "config": The actual config dict
-    """
-    global resource_configs
-
-    return get_last_resource_parameter(
-        context=context,
-        resource=resource,
-        param_id=TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-        cache_dict=resource_configs,
-    )
-
-
-@plugin
 def safe_resource_state(
     context: Context,
     resource: "terraform::Resource",  # type: ignore
@@ -347,32 +320,21 @@ def safe_resource_state(
     case, raise an Unknown value, as the state is out of sync and is dangerous
     to use.
     """
-    current_config = resource.config
-    previous_config_wrapper = get_last_resource_config(context, resource)
-    if isinstance(previous_config_wrapper, Unknown):
-        return previous_config_wrapper
-
-    previous_config_tag = previous_config_wrapper["tag"]
-    previous_config = previous_config_wrapper["config"]
-
-    if current_config != previous_config:
-        # The config has changed in this model compared to last deployment
-        # the state is therefore not safe to use.
-        return Unknown(source=resource)
+    current_config_hash = resource_config_hash(resource)
 
     previous_state_wrapper = get_last_resource_state(context, resource)
     if isinstance(previous_state_wrapper, Unknown):
         return previous_state_wrapper
 
-    previous_state_tag = previous_state_wrapper["tag"]
+    previous_state_config_hash = previous_state_wrapper["config_hash"]
 
-    if previous_config_tag != previous_state_tag:
+    if previous_state_config_hash != current_config_hash:
         # The config and the state we have in cache are out of sync, it is
         # unsafe to use, so we raise an Unknown
         return Unknown(source=resource)
 
     # We can safely get the state
-    return previous_config_wrapper["state"]
+    return previous_state_wrapper["state"]
 
 
 @plugin
@@ -515,3 +477,8 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
     LOGGER.warning(
         f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
     )
+
+
+@plugin
+def resource_config_hash(resource: "terraform::Resource") -> "string":  # type: ignore
+    return utils.dict_hash(DynamicProxy.unwrap(resource.config))

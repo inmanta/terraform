@@ -71,7 +71,6 @@ async def test_store(
     cache_agent_dir: str,
 ):
     from inmanta_plugins.terraform.helpers.const import (
-        TERRAFORM_RESOURCE_CONFIG_PARAMETER,
         TERRAFORM_RESOURCE_STATE_PARAMETER,
     )
 
@@ -109,12 +108,14 @@ async def test_store(
     resource: Resource = project.get_resource(
         local_file.resource_type, resource_name="my file"
     )
+    entity = project.get_instances(local_file.resource_type)[0]
+    config_hash = project.get_plugin_function("resource_config_hash")(entity)
 
     assert resource is not None
 
     resource_id = Id.resource_str(resource.id)
 
-    async def get_state_param_short() -> Optional[str]:
+    async def get_param_short() -> Optional[str]:
         return await get_param(
             environment=environment,
             client=client,
@@ -122,33 +123,18 @@ async def test_store(
             resource_id=resource_id,
         )
 
-    async def get_config_param_short() -> Optional[str]:
-        return await get_param(
-            environment=environment,
-            client=client,
-            param_id=TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-            resource_id=resource_id,
-        )
-
     assert (
-        await get_state_param_short() is None
+        await get_param_short() is None
     ), "There shouldn't be any state set at this point for this resource"
-    assert (
-        await get_config_param_short() is None
-    ), "There shouldn't be any config set at this point for this resource"
 
     assert (
         await deploy_model(project, create_model, client, environment)
         == VersionState.success
     )
 
-    state = await get_state_param_short()
+    state = await get_param_short()
     assert state is not None, "A state should have been set by now"
-
-    config = await get_config_param_short()
-    assert config is not None, "A config should have been set by now"
-
-    assert json.loads(state)["tag"] == json.loads(config)["tag"]
+    assert json.loads(state)["config_hash"] == config_hash
 
     # Delete
     delete_model = model(True)
@@ -159,7 +145,7 @@ async def test_store(
     )
 
     assert (
-        await get_state_param_short() is None
+        await get_param_short() is None
     ), "The state should have been removed, but wasn't"
 
 

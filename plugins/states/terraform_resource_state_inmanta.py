@@ -38,7 +38,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         *,
         private_file_path: str,
         param_client: ParamClient,
-        tag: str,
+        config_hash: str,
         private: Optional[bytes] = None,
         state: Optional[dict] = None,
     ) -> None:
@@ -58,7 +58,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             private=private,
             state=state,
         )
-        self.tag = tag
+        self.config_hash = config_hash
         self._private_file_path = Path(private_file_path)
         self._param_client = param_client
 
@@ -106,7 +106,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         the cached value.
         """
         state_dict = {
-            "tag": self.tag,
+            "config_hash": self.config_hash,
             "state": value,
         }
 

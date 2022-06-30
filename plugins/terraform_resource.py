@@ -30,13 +30,11 @@ from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, p
 from inmanta.agent.io.local import IOBase
 from inmanta.protocol.endpoints import Client
 from inmanta.resources import Id, PurgeableResource, resource
-from inmanta_plugins.terraform.helpers.const import (
-    TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-    TERRAFORM_RESOURCE_STATE_PARAMETER,
-)
+from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (
     build_resource_state,
+    dict_hash,
     parse_resource_state,
 )
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
@@ -257,7 +255,7 @@ class TerraformResourceHandler(CRUDHandler):
             type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
-            tag=self.deployment_tag,
+            config_hash=dict_hash(resource.resource_config),
         )
 
         self.provider = TerraformProvider(
@@ -273,6 +271,8 @@ class TerraformResourceHandler(CRUDHandler):
             ctx.logger,
         )
 
+        # The config can contain references to other resource attributes
+        # We resolve any of those now and update the resource_config
         resource.resource_config = build_resource_state(
             resource.resource_config,
             Client("agent"),
@@ -294,21 +294,6 @@ class TerraformResourceHandler(CRUDHandler):
                 ctx.debug("Provider logs", logs="".join(lines))
 
         Path(self.log_file_path).unlink()
-
-        # Save the config used for this deployment in a parameter
-        param_client = ParamClient(
-            str(self._agent.environment),
-            Client("agent"),
-            lambda func: self.run_sync(func),
-            TERRAFORM_RESOURCE_CONFIG_PARAMETER,
-            Id.resource_str(resource.id),
-        )
-        config_param = {
-            "tag": self.deployment_tag,
-            "config": resource.resource_config,
-        }
-        ctx.debug("Saving resource config to params", **config_param)
-        param_client.set(json.dumps(config_param))
 
     def read_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """
