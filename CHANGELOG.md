@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2 - ?
+- Fix repair issue when resource has been deleted (introduced in 1.2.1)
+
 ## 1.2.1 - 30/06/2022
 - Fix issue with null states (#47)
 
