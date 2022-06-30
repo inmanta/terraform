@@ -136,10 +136,23 @@ def test_deprecated_config(project: Project) -> None:
     )
     stdout, stderr = result.communicate()
     assert result.returncode == 0, stderr
-    assert stdout == (
-        "inmanta_plugins.terraformWARNING The usage of config '' at "
-        f"{project._test_project_dir}/main.cf:3 is deprecated\n"
-    )
+
+    desired_logs = {
+        (
+            "inmanta_plugins.terraformWARNING The usage of config '' at "
+            f"{project._test_project_dir}/main.cf:3 is deprecated"
+        ),
+        (
+            # prior to https://github.com/inmanta/inmanta-core/commit/64798acc8abcc3b7b31ab657f1d04e1974209d6f
+            "inmanta_plugins.terraformWARNING The usage of config '' at "
+            "./main.cf:3 is deprecated"
+        ),
+    }
+
+    output_lines = set(stdout.split("\n"))
+    assert (
+        output_lines & desired_logs
+    ), f"Didn't find at least one of the expected logs in output: {desired_logs} & {output_lines} = {{}}"
 
 
 @pytest.mark.terraform_provider_local

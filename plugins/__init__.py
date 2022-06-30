@@ -34,6 +34,9 @@ from inmanta_plugins.terraform.helpers.const import (
 )
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 
+LOGGER = logging.getLogger(__name__)
+
+
 # This dict contains all resource state parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
 resource_states: dict[str, dict] = dict()
@@ -497,6 +500,6 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
     config_path_str = ".".join(reversed(config_path))
 
-    logging.getLogger(__name__).warning(
+    LOGGER.warning(
         f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
     )

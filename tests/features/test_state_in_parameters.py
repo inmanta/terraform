@@ -240,8 +240,7 @@ async def test_create_failed(
     assert not file_path_object.exists()
 
     param = await get_state_param_short()
-    assert param is not None, "A state should have been set by now"
-    assert param == "null", "The file isn't deployed, his state is null"
+    assert param is None, "A null state should not be deployed"
 
     # Delete
     delete_model = model(True)
@@ -348,8 +347,12 @@ async def test_update_failed(
         == VersionState.failed
     )
     param = await get_state_param_short()
-    assert param is not None, "The state should still be there"
-    assert param == "null", "The state should be empty as the new file couldn't deploy"
+    assert param is None, (
+        "Moving a file actually means removing the old one and creating the new one.  "
+        "If we failed to move the file to the new location, we should still manage to "
+        "delete the previous one (and remove its state with it).  We don't have a new "
+        "state as there is no new file."
+    )
 
     # Delete
     delete_model = model(True)
