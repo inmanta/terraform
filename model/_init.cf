@@ -120,25 +120,28 @@ Resource.root_config [0:1] -- terraform::config::Block
 
 index Resource(provider, type, name)
 
-implement Resource using resourceConfig
+implement Resource using resourceManualConfig when self.manual_config
+implement Resource using resourceBlockConfig when not self.manual_config
 
-implementation resourceConfig for Resource:
+implementation resourceManualConfig for Resource:
     """
     If self.manual_config is true, the user should provide the config as a dict
     directly to the entity.  The root_config relation should then be set to null.
+    """
+    self.root_config = null
+end
+
+implementation resourceBlockConfig for Resource:
+    """
     If self.manual_config is false, the user should provide the root_config
     relation, the Block entity will be serialized and attached to this entity
     config attribute.
     """
-    if self.manual_config:
-        self.root_config = null
-    else:
-        # Making sure our root_config will be recognized as such
-        self.root_config.name = null
+    # Making sure our root_config will be recognized as such
+    self.root_config.name = null
 
-        # Get the state from parameter and attach it to the config block
-        self.root_config._state = safe_resource_state(self)
+    # Get the state from parameter and attach it to the config block
+    self.root_config._state = safe_resource_state(self)
 
-        self.config = self.root_config._config
-    end
+    self.config = self.root_config._config
 end
