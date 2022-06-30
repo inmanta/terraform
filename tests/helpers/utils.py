@@ -20,7 +20,7 @@ import inspect
 import json
 import logging
 import time
-from typing import Callable, TypeVar
+from typing import Callable, Optional, TypeVar
 from uuid import UUID
 
 from pytest_inmanta.plugin import Project
@@ -65,6 +65,28 @@ async def retry_limited(fun, timeout, *args, **kwargs):
         await asyncio.sleep(1)
     if not (await fun_wrapper()):
         raise TimeoutError("Bounded wait failed")
+
+
+async def get_param(
+    environment: str, client: Client, param_id: str, resource_id: str
+) -> Optional[str]:
+    result = await client.get_param(
+        tid=environment,
+        id=param_id,
+        resource_id=resource_id,
+    )
+    if result.code == 200:
+        return result.result["parameter"]["value"]
+
+    if result.code == 404:
+        return None
+
+    if result.code == 503:
+        # In our specific case, we might get a 503 if the parameter is not set yet
+        # https://github.com/inmanta/inmanta-core/blob/5bfe60683f7e21657794eaf222f43e4c53540bb5/src/inmanta/server/agentmanager.py#L799
+        return None
+
+    assert False, f"Unexpected response from server: {result.code}, {result.message}"
 
 
 async def deploy_model(

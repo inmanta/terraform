@@ -142,7 +142,8 @@ class TerraformResourceClient:
         else:
             raise PluginResponseException(
                 "Invalid response from provider for ImportResourceState when importing resource.  "
-                "Received null state, this MUST NOT not happen."
+                "Received null state, this MUST NOT not happen.",
+                [],
             )
 
         return self.resource_state.state
@@ -173,24 +174,20 @@ class TerraformResourceClient:
 
         self.resource_state.private = result.private
 
-        # Sanity check, the new state here should never be none as it should contain
-        # the current state of the resource.  This state is based upon the information
-        # we provide in the call, which is already more complete than None
         # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L189
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
+        self.logger.info(f"Read resource with state: {json.dumps(new_state, indent=2)}")
         if new_state is not None:
             self.resource_state.state = new_state
-        else:
-            raise PluginResponseException(
-                "Invalid response from provider for ResourceChange when reading resource.  "
-                "Received null state, this MUST NOT not happen."
-            )
+            return self.resource_state.state
 
-        self.logger.info(
-            f"Read resource with state: {json.dumps(self.resource_state.state, indent=2)}"
-        )
-
-        return self.resource_state.state
+        # We can actually receive a None state here, if the provider can not find the
+        # resource, with all the information contained in the state.
+        # This can happen if we deleted the local file manually for example.
+        # In this case, we should delete any state information we have, as it is not
+        # correct.
+        self.resource_state.purge()
+        return None
 
     def create_resource(self, desired: dict) -> Optional[dict]:
         """
@@ -336,7 +333,8 @@ class TerraformResourceClient:
         if new_state is None:
             raise PluginResponseException(
                 "Invalid response from provider for ApplyResourceChange when updating resource.  "
-                "Received null state, this MUST NOT happen."
+                "Received null state, this MUST NOT happen.",
+                [],
             )
 
         return self.resource_state.state

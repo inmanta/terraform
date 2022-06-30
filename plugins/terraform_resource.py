@@ -20,6 +20,7 @@ import copy
 import json
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -33,6 +34,7 @@ from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PAR
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (
     build_resource_state,
+    dict_hash,
     parse_resource_state,
 )
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
@@ -113,6 +115,7 @@ class TerraformResourceHandler(CRUDHandler):
         self._resource_client: Optional[TerraformResourceClient] = None
         self.log_file_path = ""
         self.private_file_path = ""
+        self.deployment_tag = str(uuid.uuid4())
 
     @property
     def resource_client(self) -> TerraformResourceClient:
@@ -199,6 +202,8 @@ class TerraformResourceHandler(CRUDHandler):
          - Ensure we have a state file
          - Start the provider process
         """
+        self.deployment_tag = str(uuid.uuid4())
+
         provider_installer = ProviderInstaller(
             namespace=resource.provider_namespace,
             type=resource.provider_type,
@@ -250,6 +255,7 @@ class TerraformResourceHandler(CRUDHandler):
             type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
+            config_hash=dict_hash(resource.resource_config),
         )
 
         self.provider = TerraformProvider(
@@ -265,6 +271,8 @@ class TerraformResourceHandler(CRUDHandler):
             ctx.logger,
         )
 
+        # The config can contain references to other resource attributes
+        # We resolve any of those now and update the resource_config
         resource.resource_config = build_resource_state(
             resource.resource_config,
             Client("agent"),

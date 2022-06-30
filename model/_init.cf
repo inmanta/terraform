@@ -42,7 +42,7 @@ entity Provider:
     dict config
     bool manual_config = true
 
-    bool auto_agent=true
+    bool auto_agent = true
 end
 
 Provider.agent_config [1] -- std::AgentConfig
@@ -53,7 +53,8 @@ Provider.root_config [0:1] -- terraform::config::Block
 
 index Provider(namespace, type, version, alias)
 
-implement Provider using providerConfig
+implement Provider using providerManualConfig when self.manual_config
+implement Provider using providerBlockConfig when not self.manual_config
 implement Provider using agentConfig when auto_agent
 
 implementation agentConfig for Provider:
@@ -65,19 +66,28 @@ implementation agentConfig for Provider:
     )
 end
 
-implementation providerConfig for Provider:
+implementation providerManualConfig for Provider:
     """
     If self.manual_config is true, the user should provide the config as a dict
     directly to the entity.  The root_config relation should then be set to null.
+    """
+    self.root_config = null
+end
+
+implementation providerBlockConfig for Provider:
+    """
     If self.manual_config is false, the user should provide the root_config
     relation, the Block entity will be serialized and attached to this entity
     config attribute.
     """
-    if self.manual_config:
-        self.root_config = null
-    else:
-        self.config = self.root_config._config
-    end
+    # Making sure our root_config will be recognized as such
+    self.root_config.name = null
+    
+    # For the provider, we don't store any state in parameter, so the state
+    # is actually (assumed to be) the current config
+    self.root_config._state = self.root_config._config
+
+    self.config = self.root_config._config
 end
 
 entity Resource extends std::PurgeableResource:
@@ -110,19 +120,28 @@ Resource.root_config [0:1] -- terraform::config::Block
 
 index Resource(provider, type, name)
 
-implement Resource using resourceConfig
+implement Resource using resourceManualConfig when self.manual_config
+implement Resource using resourceBlockConfig when not self.manual_config
 
-implementation resourceConfig for Resource:
+implementation resourceManualConfig for Resource:
     """
     If self.manual_config is true, the user should provide the config as a dict
     directly to the entity.  The root_config relation should then be set to null.
+    """
+    self.root_config = null
+end
+
+implementation resourceBlockConfig for Resource:
+    """
     If self.manual_config is false, the user should provide the root_config
     relation, the Block entity will be serialized and attached to this entity
     config attribute.
     """
-    if self.manual_config:
-        self.root_config = null
-    else:
-        self.config = self.root_config._config
-    end
+    # Making sure our root_config will be recognized as such
+    self.root_config.name = null
+
+    # Get the state from parameter and attach it to the config block
+    self.root_config._state = safe_resource_state(self)
+
+    self.config = self.root_config._config
 end
