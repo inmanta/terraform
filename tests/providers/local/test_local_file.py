@@ -181,6 +181,22 @@ async def test_crud(
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
 
+    # Repair
+    file_path_object.unlink()
+
+    assert (
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+
+    assert file_path_object.exists()
+    assert file_path_object.read_text("utf-8") == local_file.content
+
     # Delete
     delete_model = model(purged=True)
     assert (
