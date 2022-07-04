@@ -1,5 +1,5 @@
 """
-    Copyright 2021 Inmanta
+    Copyright 2022 Inmanta
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,16 +15,38 @@
 
     Contact: code@inmanta.com
 """
+from pathlib import Path
+
 import docker
 import pytest
 from providers.docker.helpers.docker_provider import DockerProvider
+from pytest_inmanta.test_parameter import path_parameter
+
+docker_socket_path = path_parameter.PathTestParameter(
+    "--docker-sock-path",
+    environment_variable="DOCKER_SOCKET_PATH",
+    usage="The path to the docker socket on the host",
+    default=Path("/var/run/docker.sock"),
+    exists=True,
+)
 
 
 @pytest.fixture(scope="package")
-def provider() -> DockerProvider:
-    return DockerProvider()
+def provider(request: pytest.FixtureRequest) -> DockerProvider:
+    return DockerProvider(
+        host="unix://" + str(docker_socket_path.resolve(request.config))
+    )
 
 
 @pytest.fixture
-def hello_world_image() -> str:
-    image_name = "hello-world:latest"
+def hello_world_image(provider: DockerProvider) -> str:
+    image_name = "docker.io/library/hello-world"
+
+    client = docker.APIClient(base_url=provider.host)
+    for image in client.images(image_name):
+        client.remove_image(image["Id"])
+
+    yield image_name
+
+    for image in client.images(image_name):
+        client.remove_image(image["Id"])

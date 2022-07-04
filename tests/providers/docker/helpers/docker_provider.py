@@ -19,14 +19,17 @@ from helpers.terraform_provider import TerraformProvider
 
 
 class DockerProvider(TerraformProvider):
-    def __init__(self, alias: str = "") -> None:
+    def __init__(
+        self, alias: str = "", *, host: str = "unix:///var/run/docker.sock"
+    ) -> None:
         """
         https://registry.terraform.io/providers/kreuzwerker/docker/2.17.0/docs
         """
         super().__init__("kreuzwerker", "docker", "2.17.0", alias)
+        self.host = host
 
     @property
     def config(self) -> dict:
         return {
-            "host": "unix:///var/run/docker.sock",
+            "host": self.host,
         }
