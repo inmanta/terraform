@@ -29,32 +29,10 @@ from pytest_inmanta.plugin import Project
 from inmanta.agent.agent import Agent
 from inmanta.const import VersionState
 from inmanta.protocol.endpoints import Client
-from inmanta.resources import Id, Resource
+from inmanta.resources import Resource
 from inmanta.server.protocol import Server
 
 LOGGER = logging.getLogger(__name__)
-
-
-async def get_param(
-    environment: str, client: Client, param_id: str, resource_id: str
-) -> Optional[str]:
-    result = await client.get_param(
-        tid=environment,
-        id=param_id,
-        resource_id=resource_id,
-    )
-    if result.code == 200:
-        return result.result["parameter"]["value"]
-
-    if result.code == 404:
-        return None
-
-    if result.code == 503:
-        # In our specific case, we might get a 503 if the parameter is not set yet
-        # https://github.com/inmanta/inmanta-core/blob/5bfe60683f7e21657794eaf222f43e4c53540bb5/src/inmanta/server/agentmanager.py#L799
-        return None
-
-    assert False, f"Unexpected response from server: {result.code}, {result.message}"
 
 
 @pytest.mark.terraform_provider_local
@@ -69,10 +47,6 @@ async def test_store(
     function_temp_dir: str,
     cache_agent_dir: str,
 ):
-    from inmanta_plugins.terraform.helpers.const import (
-        TERRAFORM_RESOURCE_STATE_PARAMETER,
-    )
-
     file_path_object = Path(function_temp_dir) / Path("test-file.txt")
 
     provider = LocalProvider()
@@ -110,18 +84,8 @@ async def test_store(
 
     assert resource is not None
 
-    resource_id = Id.resource_str(resource.id)
-
-    async def get_param_short() -> Optional[str]:
-        return await get_param(
-            environment=environment,
-            client=client,
-            param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
-            resource_id=resource_id,
-        )
-
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "There shouldn't be any state set at this point for this resource"
 
     assert (
@@ -129,7 +93,9 @@ async def test_store(
         == VersionState.success
     )
 
-    assert await get_param_short() is not None, "A state should have been set by now"
+    assert (
+        await local_file.get_state(client, environment) is not None
+    ), "A state should have been set by now"
 
     # Delete
     delete_model = model(True)
@@ -140,7 +106,7 @@ async def test_store(
     )
 
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "The state should have been removed, but wasn't"
 
 
@@ -159,10 +125,6 @@ async def test_create_failed(
     This test tries to create a file in a location that will fail.  The creation should fail and we
     should see the param containing the desired state being created anyway.
     """
-    from inmanta_plugins.terraform.helpers.const import (
-        TERRAFORM_RESOURCE_STATE_PARAMETER,
-    )
-
     file_path_object = Path("/dev/test-file.txt")
 
     provider = LocalProvider()
@@ -200,18 +162,8 @@ async def test_create_failed(
 
     assert resource is not None
 
-    resource_id = Id.resource_str(resource.id)
-
-    async def get_param_short() -> Optional[str]:
-        return await get_param(
-            environment=environment,
-            client=client,
-            param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
-            resource_id=resource_id,
-        )
-
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "There shouldn't be any state set at this point for this resource"
 
     assert (
@@ -220,7 +172,7 @@ async def test_create_failed(
     )
     assert not file_path_object.exists()
 
-    param = await get_param_short()
+    param = await local_file.get_state(client, environment)
     assert param is None, "A null state should not be deployed"
 
     # Delete
@@ -232,7 +184,7 @@ async def test_create_failed(
     )
 
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "The state should have been removed, but wasn't"
 
     assert not file_path_object.exists()
@@ -254,10 +206,6 @@ async def test_update_failed(
     This test creates a file, then update it by moving it in a forbidden location.  The update should fail
     but the param containing the state should be updated anyway, showing the current file state, which is null.
     """
-    from inmanta_plugins.terraform.helpers.const import (
-        TERRAFORM_RESOURCE_STATE_PARAMETER,
-    )
-
     file_path_object = Path(function_temp_dir) / Path("test-file.txt")
 
     provider = LocalProvider()
@@ -295,18 +243,8 @@ async def test_update_failed(
 
     assert resource is not None
 
-    resource_id = Id.resource_str(resource.id)
-
-    async def get_param_short() -> Optional[str]:
-        return await get_param(
-            environment=environment,
-            client=client,
-            param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
-            resource_id=resource_id,
-        )
-
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "There shouldn't be any state set at this point for this resource"
 
     assert (
@@ -314,7 +252,7 @@ async def test_update_failed(
         == VersionState.success
     )
 
-    param = await get_param_short()
+    param = await local_file.get_state(client, environment)
     assert param is not None, "A state should have been set by now"
 
     # Update
@@ -327,7 +265,7 @@ async def test_update_failed(
         == VersionState.failed
     )
 
-    param = await get_param_short()
+    param = await local_file.get_state(client, environment)
     assert param is None, (
         "Moving a file actually means removing the old one and creating the new one.  "
         "If we failed to move the file to the new location, we should still manage to "
@@ -344,5 +282,5 @@ async def test_update_failed(
     )
 
     assert (
-        await get_param_short() is None
+        await local_file.get_state(client, environment) is None
     ), "The state should have been removed, but wasn't"
