@@ -43,10 +43,11 @@ async def test_non_existing_resource(
     agent_factory: Callable[
         [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
     ],
-    provider: LocalProvider,
     function_temp_dir: str,
     cache_agent_dir: str,
 ):
+    provider = LocalProvider()
+
     await agent_factory(
         environment=environment,
         hostname="node1",
