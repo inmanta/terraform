@@ -43,4 +43,5 @@ Here is a list of such scenarios:
  1. Fail to create.  If the provider can not create a resource, its state should be the current deployed resource, with doesn't match the current config then.
  1. Fail to update.  If the provider can not modify an existing resource, its state should stay the current deployed resource.
  1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.
+ 1. Fail to import.  If the provided id doesn't correspond to anything that exists.
 At no point in time, a state stored in param should be null, a state always represents the latest information we managed to gather about the resource deployed.
