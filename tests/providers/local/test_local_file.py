@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model, is_deployment_with_change
+from helpers.utils import deploy_model, is_deployment, is_deployment_with_change
 from providers.local.helpers.local_file import LocalFile
 from providers.local.helpers.local_provider import LocalProvider
 from pytest_inmanta.plugin import Project
@@ -150,6 +150,19 @@ async def test_crud(
 
     assert not file_path_object.exists()
 
+    # No change
+    purged_model = model(purged=True)
+    assert (
+        await deploy_model(project, purged_model, client, environment)
+        == VersionState.success
+    )
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    assert not file_path_object.exists()
+
     # Create
     create_model = model()
     assert (
@@ -161,9 +174,24 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.created
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
+
+    # No change
+    assert (
+        await deploy_model(project, create_model, client, environment)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state == previous_state
 
     # Update
     local_file.content = local_file.content + " (updated)"
@@ -177,6 +205,10 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.updated
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state != previous_state
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
@@ -193,6 +225,10 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.created
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state == previous_state
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
@@ -208,5 +244,7 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.purged
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
 
     assert not file_path_object.exists()
