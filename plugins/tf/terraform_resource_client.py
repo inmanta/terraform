@@ -96,7 +96,7 @@ class TerraformResourceClient:
     def resource_schema(self) -> Any:
         return self.provider.schema.resource_schemas.get(self.resource_state.type_name)
 
-    def import_resource(self, id: str) -> Optional[dict]:
+    def import_resource(self, id: str) -> dict:
         """
         Import the resource.  This will, based on the resource id, get enough of the
         config so that a read operation can work.
@@ -123,30 +123,38 @@ class TerraformResourceClient:
 
         raise_for_diagnostics(result.diagnostics, "Failed to import the resource")
 
-        imported = list(result.imported_resources)
+        # We filter out any returned resource which doesn't match the import we care about
+        # as a provider might return multiple related resources.
+        # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L327-L329
+        filtered_imports = [
+            imported_resource
+            for imported_resource in list(result.imported_resources)
+            if imported_resource.type_name == self.resource_state.type_name
+        ]
 
-        if len(imported) != 1:
+        # It is possible that we still get more than one imported resource at this point.
+        # But we don't know what to do with it, so we simply fail and raise an exception.
+        if len(filtered_imports) != 1:
             raise PluginException(
-                "The resource import failed, wrong amount of resources returned: "
-                f"got {len(imported)} (expected 1)"
+                f"The resource import failed, expected 1 resource of type {self.resource_state.type_name} "
+                f"but got {len(filtered_imports)} instead: {result.imported_resources}"
             )
 
-        self.resource_state.private = imported[0].private
+        self.resource_state.private = filtered_imports[0].private
 
         # Sanity check, the new state here should never be none, as this is not enough
         # information to identify the resource
         # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L312
-        new_state = parse_response(msgpack.unpackb(imported[0].state.msgpack))
+        new_state = parse_response(msgpack.unpackb(filtered_imports[0].state.msgpack))
         if new_state is not None:
             self.resource_state.state = new_state
-        else:
-            raise PluginResponseException(
-                "Invalid response from provider for ImportResourceState when importing resource.  "
-                "Received null state, this MUST NOT not happen.",
-                [],
-            )
+            return new_state
 
-        return self.resource_state.state
+        raise PluginResponseException(
+            "Invalid response from provider for ImportResourceState when importing resource.  "
+            "Received null state, this MUST NOT not happen.",
+            [],
+        )
 
     def read_resource(self) -> Optional[dict]:
         """
