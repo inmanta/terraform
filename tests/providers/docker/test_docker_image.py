@@ -118,3 +118,65 @@ async def test_crud(
     assert last_action.change == Change.purged
 
     assert not docker_client.images(hello_world_image)
+
+
+@pytest.mark.terraform_provider_docker
+async def test_import(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    provider: DockerProvider,
+    cache_agent_dir: str,
+    hello_world_image: str,
+):
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={provider.agent: "localhost"},
+        code_loader=False,
+        agent_names=[provider.agent],
+    )
+
+    docker_client = docker.APIClient(base_url=provider.host)
+
+    image = DockerImage(
+        "hello-world",
+        provider=provider,
+        image_name=hello_world_image,
+    )
+
+    def model(purged: bool = False) -> str:
+        m = (
+            "\nimport terraform\n\n"
+            + provider.model_instance("provider")
+            + "\n"
+            + image.model_instance("image", purged)
+        )
+        LOGGER.info(m)
+        return m
+
+    docker_client.pull(hello_world_image)
+    existing_images = docker_client.images(hello_world_image)
+    assert len(existing_images) == 1
+    existing_image = existing_images[0]
+
+    image.terraform_id = existing_image["Id"]
+
+    # Try to import existing image using id
+    # This doesn't work as this is not supported by the provider for this resource
+    import_model = model()
+    assert (
+        await deploy_model(project, import_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await image.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert not last_action
+    last_state = await image.get_state(client, environment)
+    assert last_state is None

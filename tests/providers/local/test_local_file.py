@@ -182,7 +182,7 @@ async def test_crud(
 
     # No change
     assert (
-        await deploy_model(project, create_model, client, environment)
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 

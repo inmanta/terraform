@@ -12,20 +12,20 @@ Here is a table of the different normal situations we want to test, and a link t
 | | | | | | | | |
 | Yes | Yes | Yes | No | | No change/Updated | Updated |  |
 | Yes | Yes | Yes | Yes | | Purged | Deleted |  |
-| Yes | Yes | No | No | | No change/Updated | Updated | [#1 No change](../tests/providers/local/test_local_file.py#L183) [#1 Update](../tests/providers/local/test_local_file.py#L197) |
-| Yes | Yes | No | Yes | | Purged | Deleted | [#1 Delete](../tests/providers/local/test_local_file.py#L236) |
+| Yes | Yes | No | No | | No change/Updated | Updated | | [#1 No change](../tests/providers/local/test_local_file.py#L183) [#1 Update](../tests/providers/local/test_local_file.py#L197) |
+| Yes | Yes | No | Yes | | Purged | Deleted | | [#1 Delete](../tests/providers/local/test_local_file.py#L236) |
 | Yes | No | Yes | No | | No change/Updated | Created |  |
 | Yes | No | Yes | Yes | | Purged | Deleted |  |
 | Yes | No | No | No | | Created | Created |  |
 | Yes | No | No | Yes | | Purged | Deleted |  |
 | No | Yes | Yes | No | | Created | Updated |  |
 | No | Yes | Yes | Yes | | No change | Deleted |  |
-| No | Yes | No | No | | Created | Updated | [#1 Repair](../tests/providers/local/test_local_file.py#L216) |
+| No | Yes | No | No | | Created | Updated | | [#1 Repair](../tests/providers/local/test_local_file.py#L216) |
 | No | Yes | No | Yes | | No change | Deleted |  |
 | No | No | Yes | No | | Created | Created |  |
 | No | No | Yes | Yes | | Purged | Deleted |  |
-| No | No | No | No | | Created | Created | [#1 Create](../tests/providers/local/test_local_file.py#L166) |
-| No | No | No | Yes | | No change | Deleted | [#1 No change](../tests/providers/local/test_local_file.py#L153) |
+| No | No | No | No | | Created | Created | | [#1 Create](../tests/providers/local/test_local_file.py#L166) |
+| No | No | No | Yes | | No change | Deleted | | [#1 No change](../tests/providers/local/test_local_file.py#L153) |
 
 > In this table, the first four columns represent the current state, before doing any deployment with the orchestrator. 
 >   - `Exists` (Yes/No) means whether the resource we want to see deployed is already deployed.
@@ -45,3 +45,4 @@ Here is a list of such scenarios:
  1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.
  1. Fail to import.  If the provided id doesn't correspond to anything that exists.
 At no point in time, a state stored in param should be null, a state always represents the latest information we managed to gather about the resource deployed.
+ 1. Forbidden to import.  If the resource can not be imported using an id.  See [docker image import](../tests/providers/docker/test_docker_image.py#L170)

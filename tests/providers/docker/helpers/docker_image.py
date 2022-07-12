@@ -26,13 +26,20 @@ class DockerImage(TerraformResource):
         self,
         name: str,
         provider: DockerProvider,
+        terraform_id: Optional[str] = None,
         send_event: bool = False,
         *,
         image_name: str,
         force_remove: Optional[bool] = None,
         keep_locally: Optional[bool] = None,
     ) -> None:
-        super().__init__("docker_image", name, provider, send_event=send_event)
+        super().__init__(
+            "docker_image",
+            name,
+            provider,
+            terraform_id=terraform_id,
+            send_event=send_event,
+        )
 
         self.image_name = image_name
         self.force_remove = force_remove
