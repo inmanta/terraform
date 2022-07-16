@@ -274,3 +274,20 @@ class TerraformResource:
         assert (
             False
         ), f"Unexpected response from server: {result.code}, {result.message}"
+
+    async def purge_state(self, client: Client, environment: UUID) -> None:
+        """
+        Purge the state dict of this resource from the server, if it exists.  This method
+        is idempotent.
+        """
+        result = await client.delete_param(
+            tid=environment,
+            id="terraform-resource-state",
+            resource_id=self.id,
+        )
+        if result.code == 200 or result.code == 404:
+            return
+
+        assert (
+            False
+        ), f"Unexpected response from server: {result.code}, {result.message}"

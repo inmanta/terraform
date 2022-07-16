@@ -150,10 +150,11 @@ async def test_crud(
 
     assert not file_path_object.exists()
 
-    # No change
+    # No change (1)
+    # The file and the state don't exist and we don't want it deployed
     purged_model = model(purged=True)
     assert (
-        await deploy_model(project, purged_model, client, environment)
+        await deploy_model(project, purged_model, client, environment, full_deploy=True)
         == VersionState.success
     )
     last_action = await local_file.get_last_action(client, environment, is_deployment)
@@ -166,7 +167,7 @@ async def test_crud(
     # Create
     create_model = model()
     assert (
-        await deploy_model(project, create_model, client, environment)
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -180,7 +181,25 @@ async def test_crud(
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
 
-    # No change
+    # Re-create
+    await local_file.purge_state(client, environment)
+
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    previous_action = last_action
+    last_action = await local_file.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+    assert last_action is not previous_action
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+
+    # No change (2)
+    # The file and the state exist and we want it deployed
     assert (
         await deploy_model(project, create_model, client, environment, full_deploy=True)
         == VersionState.success
@@ -197,7 +216,7 @@ async def test_crud(
     local_file.content = local_file.content + " (updated)"
     update_model = model()
     assert (
-        await deploy_model(project, update_model, client, environment)
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -233,10 +252,33 @@ async def test_crud(
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
 
-    # Delete
+    # No change (3)
+    # The state exists but the file doesn't and we want it purged
+    file_path_object.unlink()
+
     delete_model = model(purged=True)
     assert (
-        await deploy_model(project, delete_model, client, environment)
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    assert not file_path_object.exists()
+
+    # Restore file
+    assert (
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+    assert file_path_object.exists()
+
+    # Delete
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -248,3 +290,15 @@ async def test_crud(
     assert last_state is None
 
     assert not file_path_object.exists()
+
+    # No change (4)
+    # The file and the state don't exist and we want it purged
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None

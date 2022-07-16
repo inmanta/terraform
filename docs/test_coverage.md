@@ -10,22 +10,22 @@ Here is a table of the different normal situations we want to test, and a link t
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Exists** | **State known** | **Terraform id provided** | **Resource purged** | | **Action** | **State** |  |  |
 | | | | | | | | |
-| Yes | Yes | Yes | No | | No change/Updated | Updated |  |
+| Yes | Yes | Yes | No | | No change/Updated | Updated | |
 | Yes | Yes | Yes | Yes | | Purged | Deleted |  |
-| Yes | Yes | No | No | | No change/Updated | Updated | | [#1 No change](../tests/providers/local/test_local_file.py#L183) [#1 Update](../tests/providers/local/test_local_file.py#L197) |
-| Yes | Yes | No | Yes | | Purged | Deleted | | [#1 Delete](../tests/providers/local/test_local_file.py#L236) |
-| Yes | No | Yes | No | | No change/Updated | Created |  |
+| Yes | Yes | No | No | | No change/Updated | Updated | | [#1 No change (2)](../tests/providers/local/test_local_file.py#L115) [#1 Update](../tests/providers/local/test_local_file.py#L115) |
+| Yes | Yes | No | Yes | | Purged | Deleted | | [#1 Delete](../tests/providers/local/test_local_file.py#L115) |
+| Yes | No | Yes | No | | No change/Updated | Created | |
 | Yes | No | Yes | Yes | | Purged | Deleted |  |
-| Yes | No | No | No | | Created | Created |  |
-| Yes | No | No | Yes | | Purged | Deleted |  |
-| No | Yes | Yes | No | | Created | Updated |  |
-| No | Yes | Yes | Yes | | No change | Deleted |  |
-| No | Yes | No | No | | Created | Updated | | [#1 Repair](../tests/providers/local/test_local_file.py#L216) |
-| No | Yes | No | Yes | | No change | Deleted |  |
-| No | No | Yes | No | | Created | Created |  |
-| No | No | Yes | Yes | | Purged | Deleted |  |
-| No | No | No | No | | Created | Created | | [#1 Create](../tests/providers/local/test_local_file.py#L166) |
-| No | No | No | Yes | | No change | Deleted | | [#1 No change](../tests/providers/local/test_local_file.py#L153) |
+| Yes | No | No | No | | Created | Created | | [#1 Re-create](../tests/providers/local/test_local_file.py#L115) |
+| Yes | No | No | Yes | | No change | Deleted | | [#1 No change (4)](../tests/providers/local/test_local_file.py#L115) |
+| No | Yes | Yes | No | | Created | Updated | |
+| No | Yes | Yes | Yes | | No change | Deleted | |
+| No | Yes | No | No | | Created | Updated | | [#1 Repair](../tests/providers/local/test_local_file.py#L115) |
+| No | Yes | No | Yes | | No change | Deleted | | [#1 No change (3)](../tests/providers/local/test_local_file.py#L115) |
+| No | No | Yes | No | | Created | Created | |
+| No | No | Yes | Yes | | Purged | Deleted | |
+| No | No | No | No | | Created | Created | | [#1 Create](../tests/providers/local/test_local_file.py#L115) |
+| No | No | No | Yes | | No change | Deleted | | [#1 No change (1)](../tests/providers/local/test_local_file.py#L115) |
 
 > In this table, the first four columns represent the current state, before doing any deployment with the orchestrator. 
 >   - `Exists` (Yes/No) means whether the resource we want to see deployed is already deployed.
