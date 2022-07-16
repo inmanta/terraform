@@ -25,7 +25,7 @@ class DockerProvider(TerraformProvider):
         """
         https://registry.terraform.io/providers/kreuzwerker/docker/2.17.0/docs
         """
-        super().__init__("kreuzwerker", "docker", "2.17.0", alias)
+        super().__init__("kreuzwerker", "docker", "2.19.0", alias)
         self.host = host
 
     @property

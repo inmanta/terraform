@@ -10,19 +10,19 @@ Here is a table of the different normal situations we want to test, and a link t
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Exists** | **State known** | **Terraform id provided** | **Resource purged** | | **Action** | **State** |  |  |
 | | | | | | | | |
-| Yes | Yes | Yes | No | | No change/Updated | Updated | |
-| Yes | Yes | Yes | Yes | | Purged | Deleted |  |
+| Yes | Yes | Yes | No | | No change/Updated | Updated | | [#2 No change (1)](../tests/providers/docker/test_docker_network.py#L38) |
+| Yes | Yes | Yes | Yes | | Purged | Deleted | | [#2 Delete (1)](../tests/providers/docker/test_docker_network.py#L38) |
 | Yes | Yes | No | No | | No change/Updated | Updated | | [#1 No change (2)](../tests/providers/local/test_local_file.py#L115) [#1 Update](../tests/providers/local/test_local_file.py#L115) |
 | Yes | Yes | No | Yes | | Purged | Deleted | | [#1 Delete](../tests/providers/local/test_local_file.py#L115) |
-| Yes | No | Yes | No | | No change/Updated | Created | |
-| Yes | No | Yes | Yes | | Purged | Deleted |  |
+| Yes | No | Yes | No | | No change/Updated | Created | | [#2 Import (1)](../tests/providers/docker/test_docker_network.py#L38) |
+| Yes | No | Yes | Yes | | Purged | Deleted | | [#2 Delete (1)](../tests/providers/docker/test_docker_network.py#L38) |
 | Yes | No | No | No | | Created | Created | | [#1 Re-create](../tests/providers/local/test_local_file.py#L115) |
 | Yes | No | No | Yes | | No change | Deleted | | [#1 No change (4)](../tests/providers/local/test_local_file.py#L115) |
-| No | Yes | Yes | No | | Created | Updated | |
+| No | Yes | Yes | No | | *Failed* | Deleted | |
 | No | Yes | Yes | Yes | | No change | Deleted | |
 | No | Yes | No | No | | Created | Updated | | [#1 Repair](../tests/providers/local/test_local_file.py#L115) |
 | No | Yes | No | Yes | | No change | Deleted | | [#1 No change (3)](../tests/providers/local/test_local_file.py#L115) |
-| No | No | Yes | No | | Created | Created | |
+| No | No | Yes | No | | *Failed* | Deleted | |
 | No | No | Yes | Yes | | Purged | Deleted | |
 | No | No | No | No | | Created | Created | | [#1 Create](../tests/providers/local/test_local_file.py#L115) |
 | No | No | No | Yes | | No change | Deleted | | [#1 No change (1)](../tests/providers/local/test_local_file.py#L115) |
@@ -34,7 +34,7 @@ Here is a table of the different normal situations we want to test, and a link t
 >   - `Resource purged` (Yes/No) means whether the resource is meant to be purged (in the desired state).
 >
 > The two next columns represent what we expect to see happening when using the terraform handler in the given situation.
->   - `Action` (No change/Updated/Created/Purged) The action that the Inmanta resource is supposed to do in the deployment.
+>   - `Action` (No change/Updated/Created/Purged) The action that the Inmanta resource is supposed to do in the deployment.  Or *Failed* if the deployment should not succeed.
 >   - `State` (Updated/Created/Deleted) What should happen to the state stored in parameters in the orchestrator.
 
 It might also be that the provider fails to do a deployment, because of permissions issues or simply internal failure.  In that was we also want to be sure we can recover as well as possible and that a single failure doesn't bring the model in a blocked state.  

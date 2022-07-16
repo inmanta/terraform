@@ -50,3 +50,17 @@ def hello_world_image(provider: DockerProvider) -> str:
 
     for image in client.images(image_name):
         client.remove_image(image["Id"])
+
+
+@pytest.fixture
+def test_network(provider: DockerProvider) -> str:
+    network_name = "terraform_test_net"
+
+    client = docker.APIClient(base_url=provider.host)
+    for network in client.networks(network_name):
+        client.remove_network(network["Id"])
+
+    yield network_name
+
+    for network in client.networks(network_name):
+        client.remove_network(network["Id"])

@@ -269,7 +269,7 @@ async def test_crud(
 
     assert not file_path_object.exists()
 
-    # Restore file
+    # Restore file and state
     assert (
         await deploy_model(project, update_model, client, environment, full_deploy=True)
         == VersionState.success

@@ -311,10 +311,19 @@ class TerraformResourceHandler(CRUDHandler):
             current_state, self.resource_client.resource_schema.block
         )
 
-        # reduce the current state to only the keys we have a desired state about
+        # Reduce the current state to only the keys we have a desired state about.
+        # This can trigger false positive updates as we don't navigate the resource
+        # config recursively.  We don't do it as it would be really complicate to
+        # get the diff in lists and sets correctly.
+        # This might get solved by https://github.com/inmanta/terraform/issues/7
         resource.resource_config = {
             k: current_state.get(k) for k in desired_state.keys()
         }
+
+        ctx.debug(
+            "Resource read with config: %(config)s",
+            config=json.dumps(resource.resource_config),
+        )
 
     def create_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """
