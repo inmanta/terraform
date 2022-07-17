@@ -172,3 +172,147 @@ async def test_crud(
     assert last_state is None
 
     assert not docker_client.networks(test_network)
+
+
+@pytest.mark.terraform_provider_docker
+async def test_non_existing_network(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    provider: DockerProvider,
+    cache_agent_dir: str,
+    test_network: str,
+):
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={provider.agent: "localhost"},
+        code_loader=False,
+        agent_names=[provider.agent],
+    )
+
+    docker_client = docker.APIClient(base_url=provider.host)
+
+    network = DockerNetwork(
+        "test",
+        provider=provider,
+        network_name=test_network,
+        attachable=False,
+    )
+
+    def model(purged: bool = False) -> str:
+        m = (
+            "\nimport terraform\n\n"
+            + provider.model_instance("provider")
+            + "\n"
+            + network.model_instance("network", purged)
+        )
+        LOGGER.info(m)
+        return m
+
+    assert not docker_client.networks(test_network)
+
+    # Create
+    # Setup the network and the state
+    create_model = model()
+    assert (
+        await deploy_model(project, create_model, client, environment)
+        == VersionState.success
+    )
+
+    last_action = await network.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+    last_state = await network.get_state(client, environment)
+    assert last_state is not None
+
+    assert docker_client.networks(test_network)
+
+    # Save the network id
+    network.terraform_id = last_state["id"]
+
+    # Delete the network
+    docker_client.remove_network(network.terraform_id)
+    assert not docker_client.networks(network.terraform_id)
+
+    # Repair (1)
+    # Create the network when we know an old state and id
+    repair_model = model()
+    assert (
+        await deploy_model(project, repair_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    previous_action = last_action
+    last_action = await network.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+    assert last_action != previous_action
+
+    last_state = await network.get_state(client, environment)
+    assert last_state is not None
+
+    assert docker_client.networks(test_network)
+
+    # Delete the network
+    docker_client.remove_network(network.terraform_id)
+    assert not docker_client.networks(network.terraform_id)
+
+    # No change (1)
+    # Delete the non-existing network when we know the old state and id
+    delete_model = model(purged=True)
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await network.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+
+    last_state = await network.get_state(client, environment)
+    assert last_state is None
+
+    assert not docker_client.networks(test_network)
+
+    # Repair (2)
+    # Create the network when we don't know the state but still know an old id
+    assert (
+        await deploy_model(project, repair_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await network.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+
+    last_state = await network.get_state(client, environment)
+    assert last_state is not None
+
+    assert docker_client.networks(test_network)
+
+    # Delete the network and the state
+    docker_client.remove_network(network.terraform_id)
+    assert not docker_client.networks(network.terraform_id)
+
+    # No change (2)
+    # Delete the non-existing network when we don't know the state but still know an old id
+    delete_model = model(purged=True)
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await network.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+
+    last_state = await network.get_state(client, environment)
+    assert last_state is None
+
+    assert not docker_client.networks(test_network)

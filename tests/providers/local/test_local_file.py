@@ -194,7 +194,7 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.created
-    assert last_action is not previous_action
+    assert last_action != previous_action
     last_state = await local_file.get_state(client, environment)
     assert last_state is not None
 

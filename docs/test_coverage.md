@@ -18,12 +18,12 @@ Here is a table of the different normal situations we want to test, and a link t
 | Yes | No | Yes | Yes | | Purged | Deleted | | [#2 Delete (1)](../tests/providers/docker/test_docker_network.py#L38) |
 | Yes | No | No | No | | Created | Created | | [#1 Re-create](../tests/providers/local/test_local_file.py#L115) |
 | Yes | No | No | Yes | | No change | Deleted | | [#1 No change (4)](../tests/providers/local/test_local_file.py#L115) |
-| No | Yes | Yes | No | | *Failed* | Deleted | |
-| No | Yes | Yes | Yes | | No change | Deleted | |
+| No | Yes | Yes | No | | Created | Updated | | [#3 Repair (1)](../tests/providers/docker/test_docker_network.py#L178) |
+| No | Yes | Yes | Yes | | No change | Deleted | | [#3 No change (1)](../tests/providers/docker/test_docker_network.py#L178) |
 | No | Yes | No | No | | Created | Updated | | [#1 Repair](../tests/providers/local/test_local_file.py#L115) |
 | No | Yes | No | Yes | | No change | Deleted | | [#1 No change (3)](../tests/providers/local/test_local_file.py#L115) |
-| No | No | Yes | No | | *Failed* | Deleted | |
-| No | No | Yes | Yes | | Purged | Deleted | |
+| No | No | Yes | No | | Created | Created | | [#3 Repair (2)](../tests/providers/docker/test_docker_network.py#L178) |
+| No | No | Yes | Yes | | Purged | Deleted | | [#3 No change (2)](../tests/providers/docker/test_docker_network.py#L178) |
 | No | No | No | No | | Created | Created | | [#1 Create](../tests/providers/local/test_local_file.py#L115) |
 | No | No | No | Yes | | No change | Deleted | | [#1 No change (1)](../tests/providers/local/test_local_file.py#L115) |
 
@@ -43,6 +43,5 @@ Here is a list of such scenarios:
  1. Fail to create.  If the provider can not create a resource, its state should be the current deployed resource, with doesn't match the current config then.
  1. Fail to update.  If the provider can not modify an existing resource, its state should stay the current deployed resource.
  1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.
- 1. Fail to import.  If the provided id doesn't correspond to anything that exists.
-At no point in time, a state stored in param should be null, a state always represents the latest information we managed to gather about the resource deployed.
+ 1. Fail to import.  If the provided id doesn't correspond to anything that exists.  See [docker non-existing network import](../tests/providers/docker/test_docker_network.py#L178)
  1. Forbidden to import.  If the resource can not be imported using an id.  See [docker image import](../tests/providers/docker/test_docker_image.py#L170)

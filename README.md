@@ -172,7 +172,7 @@ terraform::Resource(
 > :heavy_check_mark: (*supported*)
 
 Terraform allows to import existing resources that are not currently managed into the model so that they become managed.  We can do this too by making use of the `terraform_id` attribute.
-When it is set, and if the resource doesn't have a state yet (isn't managed yet), we will first try to import it.  If the import fails, the resource deployment will fail too.
+When it is set, and if the resource doesn't have a state yet (isn't managed yet), we will first try to import it.  If the import fails because this is not supported for this resource type, the resource deployment will fail too.  If the import simply can't find the resource, we log a warning and go on with the deployment, a new resource will then be deployed.
 
 *Example:*
 ```
