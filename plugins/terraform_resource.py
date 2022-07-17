@@ -303,12 +303,13 @@ class TerraformResourceHandler(CRUDHandler):
             self.resource_client.import_resource(resource.terraform_id)
             current_state = self.resource_client.read_resource()
 
-            # If at this point the current_state is None, it means that the resource id provided doesn't
-            # correspond to any existing resource.  Terraform choses to fail on such situation:
-            # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/terraform/node_resource_import.go#L239
-            # We will simply consider the resource to be purged and log a warning to say to the user
-            # that the id is not valid.  We expect the user not to include this id in the model anymore.
-            ctx.warning("Cannot import non-existent remote object")
+            if current_state is None:
+                # If at this point the current_state is None, it means that the resource id provided doesn't
+                # correspond to any existing resource.  Terraform choses to fail on such situation:
+                # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/terraform/node_resource_import.go#L239
+                # We will simply consider the resource to be purged and log a warning to say to the user
+                # that the id is not valid.  We expect the user not to include this id in the model anymore.
+                ctx.warning("Cannot import non-existent remote object")
 
         if not current_state:
             raise ResourcePurged()
