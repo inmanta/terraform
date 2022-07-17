@@ -38,6 +38,7 @@ from inmanta_plugins.terraform.helpers.utils import (
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
     TerraformResourceStateInmanta,
 )
+from inmanta_plugins.terraform.tf.exceptions import ResourceLookupException
 from inmanta_plugins.terraform.tf.terraform_provider import TerraformProvider
 from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
 from inmanta_plugins.terraform.tf.terraform_resource_client import (
@@ -300,16 +301,15 @@ class TerraformResourceHandler(CRUDHandler):
         """
         current_state = self.resource_client.read_resource()
         if current_state is None and resource.terraform_id is not None:
-            self.resource_client.import_resource(resource.terraform_id)
-            current_state = self.resource_client.read_resource()
-
-            if current_state is None:
-                # If at this point the current_state is None, it means that the resource id provided doesn't
-                # correspond to any existing resource.  Terraform choses to fail on such situation:
-                # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/terraform/node_resource_import.go#L239
+            try:
+                current_state = self.resource_client.import_resource(
+                    resource.terraform_id
+                )
+            except ResourceLookupException as e:
+                # We will get this exception if the resource can not be imported because it doesn't exist.
                 # We will simply consider the resource to be purged and log a warning to say to the user
                 # that the id is not valid.  We expect the user not to include this id in the model anymore.
-                ctx.warning("Cannot import non-existent remote object")
+                ctx.warning(e.message)
 
         if not current_state:
             raise ResourcePurged()
