@@ -40,7 +40,7 @@ def provider(request: pytest.FixtureRequest) -> DockerProvider:
 
 @pytest.fixture
 def hello_world_image(provider: DockerProvider) -> str:
-    image_name = "docker.io/library/hello-world"
+    image_name = "hello-world"
 
     client = docker.APIClient(base_url=provider.host)
     for image in client.images(image_name):
