@@ -295,6 +295,7 @@ async def test_non_existing_network(
 
     last_state = await network.get_state(client, environment)
     assert last_state is not None
+    network.terraform_id = last_state["id"]
 
     assert docker_client.networks(test_network)
 
