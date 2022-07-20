@@ -61,6 +61,7 @@ async def test_crud(
         "hello-world",
         provider=provider,
         image_name=hello_world_image,
+        keep_locally=True,
     )
 
     def model(purged: bool = False) -> str:
@@ -147,6 +148,7 @@ async def test_import(
         "hello-world",
         provider=provider,
         image_name=hello_world_image,
+        keep_locally=True,
     )
 
     def model(purged: bool = False) -> str:
