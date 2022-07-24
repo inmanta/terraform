@@ -302,3 +302,72 @@ async def test_crud(
     assert last_action.change == Change.nochange
     last_state = await local_file.get_state(client, environment)
     assert last_state is None
+
+
+@pytest.mark.terraform_provider_local
+async def test_failure(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    provider: LocalProvider,
+    function_temp_dir: str,
+    cache_agent_dir: str,
+):
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={provider.agent: "localhost"},
+        code_loader=False,
+        agent_names=[provider.agent],
+    )
+
+    file_path_object = Path(function_temp_dir, "test-dir", "test-file.txt")
+    dir_path_object = file_path_object.parent
+
+    local_file = LocalFile(
+        "my file", str(file_path_object), "my original content", provider
+    )
+
+    def model(purged: bool = False) -> str:
+        m = (
+            "\nimport terraform\n\n"
+            + provider.model_instance("provider")
+            + "\n"
+            + local_file.model_instance("file", purged)
+        )
+        LOGGER.info(m)
+        return m
+
+    # Make it impossible to read the file
+    dir_path_object.mkdir(mode=0o220, parents=True, exist_ok=True)
+
+    # Fail to read
+    create_model = model()
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action is None
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    # Make it impossible to write the file
+    dir_path_object.chmod(mode=0o660)
+
+    # Fail to create
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(client, environment)
+    assert last_action is not None
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None

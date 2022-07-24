@@ -39,8 +39,8 @@ Here is a table of the different normal situations we want to test, and a link t
 
 It might also be that the provider fails to do a deployment, because of permissions issues or simply internal failure.  In that was we also want to be sure we can recover as well as possible and that a single failure doesn't bring the model in a blocked state.  
 Here is a list of such scenarios:
- 1. Fail to read.  If the provider can not read a resource, its state should stay untouched.
- 1. Fail to create.  If the provider can not create a resource, its state should be the current deployed resource, with doesn't match the current config then.
+ 1. Fail to read.  If the provider can not read a resource, its state should stay untouched.  See [local file](../tests/providers/local/test_local_file.py#L308)
+ 1. Fail to create.  If the provider can not create a resource, its state should be the current deployed resource, with doesn't match the current config then.  See [local file](../tests/providers/local/test_local_file.py#L308)
  1. Fail to update.  If the provider can not modify an existing resource, its state should stay the current deployed resource.
  1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.
  1. Fail to import.  If the provided id doesn't correspond to anything that exists.  See [docker non-existing network import](../tests/providers/docker/test_docker_network.py#L178)

@@ -116,7 +116,7 @@ class TerraformResource:
         client: Client,
         environment: UUID,
         oldest_first: bool = False,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Iterable[model.ResourceAction]:
@@ -215,7 +215,7 @@ class TerraformResource:
         self,
         client: Client,
         environment: UUID,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Optional[model.ResourceAction]:
@@ -235,7 +235,7 @@ class TerraformResource:
         self,
         client: Client,
         environment: UUID,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Optional[model.ResourceAction]:
