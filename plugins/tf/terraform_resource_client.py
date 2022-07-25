@@ -40,6 +40,7 @@ from inmanta_plugins.terraform.helpers.utils import fill_partial_state
 from inmanta_plugins.terraform.tf.exceptions import (
     PluginException,
     PluginResponseException,
+    ResourceLookupException,
 )
 from inmanta_plugins.terraform.tf.terraform_provider import (
     TerraformProvider,
@@ -96,10 +97,14 @@ class TerraformResourceClient:
     def resource_schema(self) -> Any:
         return self.provider.schema.resource_schemas.get(self.resource_state.type_name)
 
-    def import_resource(self, id: str) -> Optional[dict]:
+    def import_resource(self, id: str) -> dict:
         """
-        Import the resource.  This will, based on the resource id, get enough of the
-        config so that a read operation can work.
+        Import the resource.
+
+        First runs the import, then the read operation.  If the import fails because
+        the resource can not be found, raises a ResourceLookupException.
+
+        Returns the state of the imported resource and saves it in the state store.
 
         :param id: The identifier of the resource, as the provider would know it.
         """
@@ -112,40 +117,87 @@ class TerraformResourceClient:
                 f"a different id: {self.resource_state.state.get('id')} != {id}"
             )
 
-        result = self.provider.stub.ImportResourceState(
+        import_result = self.provider.stub.ImportResourceState(
             tfplugin5_pb2.ImportResourceState.Request(
                 type_name=self.resource_state.type_name,
                 id=id,
             )
         )
 
-        self.logger.debug(f"Import resource response: {str(result)}")
+        self.logger.debug(f"Import resource response: {str(import_result)}")
 
-        raise_for_diagnostics(result.diagnostics, "Failed to import the resource")
+        raise_for_diagnostics(
+            import_result.diagnostics, "Failed to import the resource"
+        )
 
-        imported = list(result.imported_resources)
+        # We filter out any returned resource which doesn't match the import we care about
+        # as a provider might return multiple related resources.
+        # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L327-L329
+        filtered_imports = [
+            imported_resource
+            for imported_resource in list(import_result.imported_resources)
+            if imported_resource.type_name == self.resource_state.type_name
+        ]
 
-        if len(imported) != 1:
-            raise PluginException(
-                "The resource import failed, wrong amount of resources returned: "
-                f"got {len(imported)} (expected 1)"
+        # If we didn't receive any resource we tried to import, we raise a lookup error
+        if not filtered_imports:
+            raise ResourceLookupException(
+                "Cannot import non-existent remote object",
+                self.resource_state.type_name,
+                id,
             )
 
-        self.resource_state.private = imported[0].private
+        # It is possible that we still get more than one imported resource at this point.
+        # But we don't know what to do with it, so we simply fail and raise an exception.
+        if len(filtered_imports) > 1:
+            raise PluginException(
+                f"The resource import failed, expected 1 resource of type {self.resource_state.type_name} "
+                f"but got {len(filtered_imports)} instead: {import_result.imported_resources}"
+            )
 
         # Sanity check, the new state here should never be none, as this is not enough
         # information to identify the resource
         # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L312
-        new_state = parse_response(msgpack.unpackb(imported[0].state.msgpack))
-        if new_state is not None:
-            self.resource_state.state = new_state
-        else:
+        new_state = parse_response(msgpack.unpackb(filtered_imports[0].state.msgpack))
+        if new_state is None:
             raise PluginResponseException(
                 "Invalid response from provider for ImportResourceState when importing resource.  "
-                "Received null state, this MUST NOT not happen."
+                "Received null state, this MUST NOT not happen.",
+                [],
             )
 
-        return self.resource_state.state
+        # To complete the import, we need to perform a read, as it might show us that the resource
+        # we imported doesn't actually exists.
+        read_result = self.provider.stub.ReadResource(
+            tfplugin5_pb2.ReadResource.Request(
+                type_name=self.resource_state.type_name,
+                current_state=tfplugin5_pb2.DynamicValue(
+                    msgpack=filtered_imports[0].state.msgpack
+                ),
+                private=filtered_imports[0].private,
+            )
+        )
+
+        self.logger.debug(f"Imported resource read response: {str(read_result)}")
+
+        raise_for_diagnostics(read_result.diagnostics, "Failed to read the resource")
+
+        new_state = parse_response(msgpack.unpackb(read_result.new_state.msgpack))
+        if new_state is None:
+            # If at this point the current_state is None, it means that the resource id provided doesn't
+            # correspond to any existing resource.  Terraform choses to fail on such situation:
+            # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/terraform/node_resource_import.go#L239
+            # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/terraform/node_resource_abstract_instance.go#L490
+            raise ResourceLookupException(
+                "Cannot import non-existent remote object",
+                self.resource_state.type_name,
+                id,
+            )
+
+        self.resource_state.state = new_state
+        self.resource_state.private = read_result.private
+
+        return new_state
 
     def read_resource(self) -> Optional[dict]:
         """
@@ -173,24 +225,20 @@ class TerraformResourceClient:
 
         self.resource_state.private = result.private
 
-        # Sanity check, the new state here should never be none as it should contain
-        # the current state of the resource.  This state is based upon the information
-        # we provide in the call, which is already more complete than None
         # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L189
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
+        self.logger.info(f"Read resource with state: {json.dumps(new_state, indent=2)}")
         if new_state is not None:
             self.resource_state.state = new_state
-        else:
-            raise PluginResponseException(
-                "Invalid response from provider for ResourceChange when reading resource.  "
-                "Received null state, this MUST NOT not happen."
-            )
+            return self.resource_state.state
 
-        self.logger.info(
-            f"Read resource with state: {json.dumps(self.resource_state.state, indent=2)}"
-        )
-
-        return self.resource_state.state
+        # We can actually receive a None state here, if the provider can not find the
+        # resource, with all the information contained in the state.
+        # This can happen if we deleted the local file manually for example.
+        # In this case, we should delete any state information we have, as it is not
+        # correct.
+        self.resource_state.purge()
+        return None
 
     def create_resource(self, desired: dict) -> Optional[dict]:
         """
@@ -336,7 +384,8 @@ class TerraformResourceClient:
         if new_state is None:
             raise PluginResponseException(
                 "Invalid response from provider for ApplyResourceChange when updating resource.  "
-                "Received null state, this MUST NOT happen."
+                "Received null state, this MUST NOT happen.",
+                [],
             )
 
         return self.resource_state.state

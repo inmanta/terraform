@@ -30,6 +30,18 @@ class PluginException(Exception):
         super().__init__(message)
 
 
+class ResourceLookupException(PluginException, LookupError):
+    def __init__(self, message: str, resource_type: str, id: str) -> None:
+        """
+        This is exception is raised if the plugin client fails to find a resource
+        in the import method.
+        """
+        super().__init__(f"Failed to import {resource_type} with id {id}: {message}")
+        self.message = message
+        self.resource_type = resource_type
+        self.id = id
+
+
 class PluginResponseException(PluginException):
     def __init__(self, message: str, diagnostics: List[Diagnostic]) -> None:
         """

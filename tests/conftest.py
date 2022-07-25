@@ -65,6 +65,7 @@ provider_parameters = [
         "github",
         "gitlab",
         "local",
+        "docker",
     )
 ]
 

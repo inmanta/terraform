@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model, is_deployment_with_change
+from helpers.utils import deploy_model, is_deployment, is_deployment_with_change
 from providers.local.helpers.local_file import LocalFile
 from providers.local.helpers.local_provider import LocalProvider
 from pytest_inmanta.plugin import Project
@@ -150,10 +150,24 @@ async def test_crud(
 
     assert not file_path_object.exists()
 
+    # No change (1)
+    # The file and the state don't exist and we don't want it deployed
+    purged_model = model(purged=True)
+    assert (
+        await deploy_model(project, purged_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    assert not file_path_object.exists()
+
     # Create
     create_model = model()
     assert (
-        await deploy_model(project, create_model, client, environment)
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -161,15 +175,48 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.created
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
+
+    # Re-create
+    await local_file.purge_state(client, environment)
+
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    previous_action = last_action
+    last_action = await local_file.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+    assert last_action != previous_action
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+
+    # No change (2)
+    # The file and the state exist and we want it deployed
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state == previous_state
 
     # Update
     local_file.content = local_file.content + " (updated)"
     update_model = model()
     assert (
-        await deploy_model(project, update_model, client, environment)
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -177,14 +224,61 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.updated
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state != previous_state
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
 
-    # Delete
+    # Repair
+    file_path_object.unlink()
+
+    assert (
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action.change == Change.created
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+    assert last_state == previous_state
+
+    assert file_path_object.exists()
+    assert file_path_object.read_text("utf-8") == local_file.content
+
+    # No change (3)
+    # The state exists but the file doesn't and we want it purged
+    file_path_object.unlink()
+
     delete_model = model(purged=True)
     assert (
-        await deploy_model(project, delete_model, client, environment)
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    assert not file_path_object.exists()
+
+    # Restore file and state
+    assert (
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+    assert file_path_object.exists()
+
+    # Delete
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
         == VersionState.success
     )
 
@@ -192,5 +286,88 @@ async def test_crud(
         client, environment, is_deployment_with_change
     )
     assert last_action.change == Change.purged
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
 
     assert not file_path_object.exists()
+
+    # No change (4)
+    # The file and the state don't exist and we want it purged
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+
+@pytest.mark.terraform_provider_local
+async def test_failure(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    provider: LocalProvider,
+    function_temp_dir: str,
+    cache_agent_dir: str,
+):
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={provider.agent: "localhost"},
+        code_loader=False,
+        agent_names=[provider.agent],
+    )
+
+    file_path_object = Path(function_temp_dir, "test-dir", "test-file.txt")
+    dir_path_object = file_path_object.parent
+
+    local_file = LocalFile(
+        "my file", str(file_path_object), "my original content", provider
+    )
+
+    def model(purged: bool = False) -> str:
+        m = (
+            "\nimport terraform\n\n"
+            + provider.model_instance("provider")
+            + "\n"
+            + local_file.model_instance("file", purged)
+        )
+        LOGGER.info(m)
+        return m
+
+    # Make it impossible to read the file
+    dir_path_object.mkdir(mode=0o220, parents=True, exist_ok=True)
+
+    # Fail to read
+    create_model = model()
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(client, environment, is_deployment)
+    assert last_action is None
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
+
+    # Make it impossible to write the file
+    dir_path_object.chmod(mode=0o660)
+
+    # Fail to create
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(client, environment)
+    assert last_action is not None
+    assert last_action.change == Change.nochange
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is None
