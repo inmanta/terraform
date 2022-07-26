@@ -111,7 +111,7 @@ async def deploy(
     client: Client,
     environment: UUID,
     full_deploy: bool = False,
-    timeout: int = 120,
+    timeout: int = 15,
 ) -> Result:
     """
     Asynchronously deploy model and wait for its deployment to complete
@@ -159,6 +159,12 @@ async def deploy(
             f"Timeout reached when waiting for resource to deploy: {json.dumps(result.result, indent=2)}"
         )
         raise e
+
+
+def is_failed_deployment(action: model.ResourceAction) -> bool:
+    return (
+        action.action == ResourceAction.deploy and action.status == ResourceState.failed
+    )
 
 
 def is_deployment(action: model.ResourceAction) -> bool:

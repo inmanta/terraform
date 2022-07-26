@@ -257,7 +257,10 @@ class TerraformResourceHandler(CRUDHandler):
             binary_path,
             self.log_file_path,
         )
+        ctx.debug("Starting provider process")
         self.provider.open()
+
+        ctx.debug("Configuring provider")
         self.provider.configure(resource.provider_config)
 
         self._resource_client = TerraformResourceClient(
@@ -279,6 +282,7 @@ class TerraformResourceHandler(CRUDHandler):
          - Cleanup the logs
         """
         if self.provider is not None:
+            ctx.debug("Stopping provider process")
             self.provider.close()
 
         with open(self.log_file_path, "r") as f:

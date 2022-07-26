@@ -21,7 +21,12 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model, is_deployment, is_deployment_with_change
+from helpers.utils import (
+    deploy_model,
+    is_deployment,
+    is_deployment_with_change,
+    is_failed_deployment,
+)
 from providers.local.helpers.local_file import LocalFile
 from providers.local.helpers.local_provider import LocalProvider
 from pytest_inmanta.plugin import Project
@@ -342,23 +347,41 @@ async def test_failure(
         LOGGER.info(m)
         return m
 
+    # Create the file a first time
+    create_model = model()
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+    last_state = await local_file.get_state(client, environment)
+
     # Make it impossible to read the file
-    dir_path_object.mkdir(mode=0o220, parents=True, exist_ok=True)
+    dir_path_object.chmod(0o220)
 
     # Fail to read
-    create_model = model()
     assert (
         await deploy_model(project, create_model, client, environment, full_deploy=True)
         == VersionState.failed
     )
 
-    last_action = await local_file.get_last_action(client, environment, is_deployment)
-    assert last_action is None
+    last_action = await local_file.get_last_action(
+        client, environment, is_failed_deployment
+    )
+    assert last_action is not None
+    messages = [msg["msg"] for msg in last_action.messages]
+    assert "Calling read_resource" in messages
+    assert "Calling create_resource" not in messages
+
+    previous_state = last_state
     last_state = await local_file.get_state(client, environment)
-    assert last_state is None
+    assert last_state == previous_state
+
+    # Remove the existing file
+    dir_path_object.chmod(0o770)
+    file_path_object.unlink()
 
     # Make it impossible to write the file
-    dir_path_object.chmod(mode=0o660)
+    dir_path_object.chmod(0o550)
 
     # Fail to create
     assert (
@@ -366,8 +389,78 @@ async def test_failure(
         == VersionState.failed
     )
 
-    last_action = await local_file.get_last_action(client, environment)
+    previous_action = last_action
+    last_action = await local_file.get_last_action(
+        client, environment, is_failed_deployment
+    )
     assert last_action is not None
-    assert last_action.change == Change.nochange
+    assert last_action != previous_action
+    messages = [msg["msg"] for msg in last_action.messages]
+    assert "Calling read_resource" in messages
+    assert "Calling create_resource" in messages
+
     last_state = await local_file.get_state(client, environment)
     assert last_state is None
+
+    # Make it possible to create the file
+    dir_path_object.chmod(0o770)
+
+    # Create
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    last_action = await local_file.get_last_action(
+        client, environment, is_deployment_with_change
+    )
+    assert last_action is not None
+    assert last_action.change == Change.created
+    last_state = await local_file.get_state(client, environment)
+    assert last_state is not None
+
+    # Make it impossible to delete the file
+    dir_path_object.chmod(0o550)
+    file_path_object.chmod(0o550)
+
+    # TODO this below doesn't work, it looks like the local provider
+    # will consider the file removed if it can not delete it
+
+    # Fail to delete
+    delete_model = model(purged=True)
+    assert (
+        await deploy_model(project, delete_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(
+        client, environment, is_failed_deployment
+    )
+    assert last_action is not None
+    messages = [msg["msg"] for msg in last_action.messages]
+    assert "Calling read_resource" in messages
+    assert "Calling delete_resource" in messages
+
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state == previous_state
+
+    # Fail to update
+    local_file.content += " (updated)"
+    update_model = model()
+    assert (
+        await deploy_model(project, update_model, client, environment, full_deploy=True)
+        == VersionState.failed
+    )
+
+    last_action = await local_file.get_last_action(
+        client, environment, is_failed_deployment
+    )
+    assert last_action is not None
+    messages = [msg["msg"] for msg in last_action.messages]
+    assert "Calling read_resource" in messages
+    assert "Calling update_resource" in messages
+
+    previous_state = last_state
+    last_state = await local_file.get_state(client, environment)
+    assert last_state == previous_state
