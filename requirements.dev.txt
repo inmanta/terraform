@@ -6,4 +6,8 @@ cpapi
 pytest-inmanta
 types-protobuf
 types-requests
-grpcio-tools
+
+# This pre-release is broken as reported here: https://github.com/grpc/grpc/issues/30640
+# The version constraint can be removed once a newer pre-release is published.
+# Also update requirements.txt
+grpcio-tools!=1.49.0rc1

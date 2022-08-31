@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.2.4 - 30/08/2022
+- Exclude grpcio-tools==1.49.0rc1.
 ## 1.2.3 - 30/08/2022
 - Exclude grpcio==1.49.0rc1.
 
