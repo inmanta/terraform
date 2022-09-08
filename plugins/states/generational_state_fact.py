@@ -71,7 +71,7 @@ class GenerationalStateFact(StateFact):
         return cls(**state)
 
 
-class AlbatrossGenerationStateFact(StateFact):
+class AlbatrossGenerationStateFact(GenerationalStateFact):
     """
     This is the first iteration on a generational approach for state dicts.
     The generation is named "Albatross" because it is an animal starting with
