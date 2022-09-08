@@ -21,8 +21,8 @@ from typing import Optional
 class TerraformResourceState:
     """
     This class stores the minimal information required to interact with the terraform
-    provider reliably.  This simple implementation keeps eveything in memory, so it is
-    not resiliant.  Other implementations can store and load the data from file or to
+    provider reliably.  This simple implementation keeps everything in memory, so it is
+    not resilient.  Other implementations can store and load the data from file or to
     the orchestrator so that we don't loose trace of our resource between runs of the
     program.
     The class can be extended to create a compatibility layer with any persistent storage

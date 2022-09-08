@@ -41,7 +41,7 @@ It might also be that the provider fails to do a deployment, because of permissi
 Here is a list of such scenarios:
  1. Fail to read.  If the provider can not read a resource, its state should stay untouched.  See [local file](../tests/providers/local/test_local_file.py#L308)
  1. Fail to create.  If the provider can not create a resource, its state should be the current deployed resource, with doesn't match the current config then.  See [local file](../tests/providers/local/test_local_file.py#L308)
- 1. Fail to update.  If the provider can not modify an existing resource, its state should stay the current deployed resource.
- 1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.
+ 1. Fail to update.  If the provider can not modify an existing resource, its state should stay the current deployed resource.  (TODO) *Not covered by test suite, we need to find a provider with which we can lock the resource (externally) to make it readable but not modifiable.*
+ 1. Fail to delete.  If the provider can not delete an existing resource, its state shouldn't be deleted either.  (TODO) *Not covered by test suite, we need to find a provider with which we can lock the resource (externally) to make it readable but not deletable.*
  1. Fail to import.  If the provided id doesn't correspond to anything that exists.  See [docker non-existing network import](../tests/providers/docker/test_docker_network.py#L178)
  1. Forbidden to import.  If the resource can not be imported using an id.  See [docker image import](../tests/providers/docker/test_docker_image.py#L170)
