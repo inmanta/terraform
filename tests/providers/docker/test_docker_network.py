@@ -79,7 +79,7 @@ async def test_crud(
     # Create
     create_model = model()
     assert (
-        await deploy_model(project, create_model, client, environment)
+        await deploy_model(project, create_model, client, environment, timeout=30)
         == VersionState.success
     )
 

@@ -73,9 +73,10 @@ async def deploy_model(
     client: Client,
     environment: str,
     full_deploy: bool = False,
+    timeout: int = 15,
 ) -> VersionState:
     await compile_and_export(project, model)
-    deployment_result = await deploy(project, client, environment, full_deploy)
+    deployment_result = await deploy(project, client, environment, full_deploy, timeout)
     LOGGER.debug(json.dumps(deployment_result.result, indent=2))
     return deployment_result.result["model"]["result"]
 

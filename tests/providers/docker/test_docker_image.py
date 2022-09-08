@@ -78,7 +78,7 @@ async def test_crud(
     # Create
     create_model = model()
     assert (
-        await deploy_model(project, create_model, client, environment)
+        await deploy_model(project, create_model, client, environment, timeout=30)
         == VersionState.success
     )
 
@@ -94,7 +94,9 @@ async def test_crud(
     assert not docker_client.images(hello_world_image)
 
     assert (
-        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        await deploy_model(
+            project, create_model, client, environment, full_deploy=True, timeout=30
+        )
         == VersionState.success
     )
 
