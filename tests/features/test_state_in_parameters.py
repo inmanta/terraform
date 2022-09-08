@@ -22,7 +22,7 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model, get_param
+from helpers.utils import deploy_model
 from providers.local.helpers.local_file import LocalFile
 from providers.local.helpers.local_provider import LocalProvider
 from pytest_inmanta.plugin import Project

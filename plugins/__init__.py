@@ -39,18 +39,11 @@ LOGGER = logging.getLogger(__name__)
 # This avoids getting them multiple times if multiple entities use them.
 resource_states: dict[str, dict] = dict()
 
-# This dict contains all resource config parameters already queried for this compile run.
-# This avoids getting them multiple times if multiple entities use them.
-resource_configs: dict[str, dict] = dict()
-
 
 def inmanta_reset_state() -> None:
     # Resetting the resource states and configs dict between compiles
     global resource_states
     resource_states = dict()
-
-    global resource_configs
-    resource_configs = dict()
 
 
 def resource_attribute_reference(
