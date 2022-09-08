@@ -1,10 +1,14 @@
 inmanta-dev-dependencies[module,extension]==1.76.0; python_version <= '3.6'
-inmanta-dev-dependencies[module,extension]==2.24.0; python_version > '3.6'
+inmanta-dev-dependencies[module,extension]==2.34.0; python_version > '3.6'
 pytest
 netaddr
 cpapi
 pytest-inmanta
 types-protobuf
 types-requests
-grpcio-tools
 docker
+
+# This pre-release is broken as reported here: https://github.com/grpc/grpc/issues/30640
+# The version constraint can be removed once a newer pre-release is published.
+# Also update requirements.txt
+grpcio-tools!=1.49.0rc1
