@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.5 - ?
+- Fix repair issue when resource has been deleted (introduced in 1.2.1)
+
+## 1.2.4 - 30/08/2022
+- Exclude grpcio-tools==1.49.0rc1.
+
+## 1.2.3 - 30/08/2022
+- Exclude grpcio==1.49.0rc1.
+
+## 1.2.2 - 02/08/2022
+- Various dependency updates.
+
 ## 1.2.1 - 30/06/2022
 - Fix issue with null states (#47)
 

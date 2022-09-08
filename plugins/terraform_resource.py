@@ -40,6 +40,7 @@ from inmanta_plugins.terraform.helpers.utils import (
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
     TerraformResourceStateInmanta,
 )
+from inmanta_plugins.terraform.tf.exceptions import ResourceLookupException
 from inmanta_plugins.terraform.tf.terraform_provider import TerraformProvider
 from inmanta_plugins.terraform.tf.terraform_provider_installer import ProviderInstaller
 from inmanta_plugins.terraform.tf.terraform_resource_client import (
@@ -262,7 +263,10 @@ class TerraformResourceHandler(CRUDHandler):
             binary_path,
             self.log_file_path,
         )
+        ctx.debug("Starting provider process")
         self.provider.open()
+
+        ctx.debug("Configuring provider")
         self.provider.configure(resource.provider_config)
 
         self._resource_client = TerraformResourceClient(
@@ -286,6 +290,7 @@ class TerraformResourceHandler(CRUDHandler):
          - Cleanup the logs
         """
         if self.provider is not None:
+            ctx.debug("Stopping provider process")
             self.provider.close()
 
         with open(self.log_file_path, "r") as f:
@@ -308,8 +313,15 @@ class TerraformResourceHandler(CRUDHandler):
         """
         current_state = self.resource_client.read_resource()
         if current_state is None and resource.terraform_id is not None:
-            self.resource_client.import_resource(resource.terraform_id)
-            current_state = self.resource_client.read_resource()
+            try:
+                current_state = self.resource_client.import_resource(
+                    resource.terraform_id
+                )
+            except ResourceLookupException as e:
+                # We will get this exception if the resource can not be imported because it doesn't exist.
+                # We will simply consider the resource to be purged and log a warning to say to the user
+                # that the id is not valid.  We expect the user not to include this id in the model anymore.
+                ctx.warning(e.message)
 
         if not current_state:
             raise ResourcePurged()
@@ -319,10 +331,19 @@ class TerraformResourceHandler(CRUDHandler):
             current_state, self.resource_client.resource_schema.block
         )
 
-        # reduce the current state to only the keys we have a desired state about
+        # Reduce the current state to only the keys we have a desired state about.
+        # This can trigger false positive updates as we don't navigate the resource
+        # config recursively.  We don't do it as it would be really complicate to
+        # get the diff in lists and sets correctly.
+        # This might get solved by https://github.com/inmanta/terraform/issues/7
         resource.resource_config = {
             k: current_state.get(k) for k in desired_state.keys()
         }
+
+        ctx.debug(
+            "Resource read with config: %(config)s",
+            config=json.dumps(resource.resource_config),
+        )
 
     def create_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
         """

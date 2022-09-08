@@ -95,9 +95,10 @@ async def deploy_model(
     client: Client,
     environment: str,
     full_deploy: bool = False,
+    timeout: int = 15,
 ) -> VersionState:
     await compile_and_export(project, model)
-    deployment_result = await deploy(project, client, environment, full_deploy)
+    deployment_result = await deploy(project, client, environment, full_deploy, timeout)
     LOGGER.debug(json.dumps(deployment_result.result, indent=2))
     return deployment_result.result["model"]["result"]
 
@@ -133,7 +134,7 @@ async def deploy(
     client: Client,
     environment: UUID,
     full_deploy: bool = False,
-    timeout: int = 120,
+    timeout: int = 15,
 ) -> Result:
     """
     Asynchronously deploy model and wait for its deployment to complete
@@ -181,6 +182,12 @@ async def deploy(
             f"Timeout reached when waiting for resource to deploy: {json.dumps(result.result, indent=2)}"
         )
         raise e
+
+
+def is_failed_deployment(action: model.ResourceAction) -> bool:
+    return (
+        action.action == ResourceAction.deploy and action.status == ResourceState.failed
+    )
 
 
 def is_deployment(action: model.ResourceAction) -> bool:
