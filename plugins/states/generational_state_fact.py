@@ -14,6 +14,80 @@
     limitations under the License.
 
     Contact: code@inmanta.com
+
+    Module doc
+    ==========
+
+    The whole point of this generational_state_fact module is to deal with
+    different versions of the state file, possibly stored in the orchestrator,
+    due to an upgrade of the module while some resource where already deployed.
+
+    The module provides:
+    1.  StateFact classes, to represent the state dictionaries stored in the orchestrator.
+        Those are pydantic objects, and provide a class method to reconstruct the object
+        from the stored state dict.
+    2.  build_state_fact function, it allows to easily reconstruct a state fact object,
+        from its state fact dict.
+    3.  State converters, those are functions, which will always output the same type of
+        state fact, based one whatever state fact generation they received in argument.
+        Those are wrapped by a decorator, state_converter, which takes as argument the
+        desired output type.
+
+    How to use it:
+    --------------
+
+    Build the state fact object from the raw dict:
+
+        ..code-block:: python
+
+            raw_dict: dict = ...
+            state_fact = build_state_fact(raw_dict)
+
+    Make sure the state fact object is the latest generation:
+
+        ..code-block:: python
+
+            # Works like this until their is a newer generation than Albatross
+            state_fact = convert_to_albatross(state_fact)
+
+    How to extend it:
+    -----------------
+
+    1.  Create a new class extending the GenerationalStateFact:
+
+        ..code-block:: python
+
+            class BuboGenerationStateFact(GenerationalStateFact):
+                generation: str = "Bubo"
+                state: dict
+                config_hash: str
+
+                def get_state(self) -> dict:
+                    return self.state
+
+    2.  Register the new generation into the state_fact_generations dict:
+
+        ..code-block:: python
+
+            state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
+                ...,
+                BuboGenerationStateFact.generation: BuboGenerationStateFact,
+            }
+
+    3.  Create the state_transfer function to upgrade to your new generation:
+
+        ..code-block:: python
+
+            @state_converter(BuboGenerationStateFact)
+            def convert_to_albatross(
+                current_state_fact: StateFact,
+            ) -> typing.Optional[BuboGenerationStateFact]:
+                albatross_state_fact = convert_to_albatross(current_state_fact)
+                return BuboGenerationStateFact(
+                    state=albatross_state_fact.state,
+                    config_hash=albatross_state_fact.config_hash,
+                )
+
 """
 import abc
 import datetime
@@ -23,20 +97,24 @@ import pydantic
 
 SF = typing.TypeVar("SF", bound="StateFact")
 GSF = typing.TypeVar("GSF", bound="GenerationalStateFact")
+STATE_DICT_GENERATION_MARKER = "__state_dict_generation"
 
 
 class StateFact(pydantic.BaseModel):
     @abc.abstractmethod
     def get_state(self) -> dict:
         """
-        This method should be implemented for each subclass and return the dict
+        This method should be implemented for each subclass and returns the dict
         holding the resource state.  This state dict directly comes from the
         terraform handler, it doesn't contain any additional information.
         """
 
     @abc.abstractclassmethod
     def build_from_state(cls: typing.Type[SF], state: dict) -> SF:
-        """"""
+        """
+        This method should be implemented for each subclass and returns and
+        instance of the subclass, constructed with the provided state dict.
+        """
 
 
 class LegacyStateFact(StateFact):
@@ -57,14 +135,10 @@ class LegacyStateFact(StateFact):
 
 
 class GenerationalStateFact(StateFact):
-    generation: str
-
-    class Config:
-        alias_generator = (
-            lambda attribute_name: attribute_name
-            if attribute_name != "generation"
-            else "_generation"
-        )
+    # Setting an alias for generation attribute.  This attribute is used to recognize
+    # a generational state fact amongst others.  We expect that no attribute in a terraform
+    # config will ever use this as name.
+    generation: str = pydantic.Field(alias=STATE_DICT_GENERATION_MARKER)
 
     @classmethod
     def build_from_state(cls: typing.Type[GSF], state: dict) -> GSF:
@@ -99,6 +173,22 @@ This dict holds all the generations of state dicts which were supported by the m
 It can be navigated to find which class should be used to load the state stored into
 a python object.
 """
+
+
+def build_state_fact(raw_state: dict) -> StateFact:
+    """
+    This function can be used to reconstruct a state fact object from its
+    corresponding raw state dictionary..
+    """
+
+    # Get the generation attribute from the raw_state, if it is set
+    generation = raw_state.get(STATE_DICT_GENERATION_MARKER)
+
+    # Get the state fact class corresponding to this generation
+    state_fact_class = state_fact_generations[generation]
+
+    # Build the state fact and return it
+    return state_fact_class.build_from_state(raw_state)
 
 
 def state_converter(

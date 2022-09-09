@@ -25,8 +25,8 @@ from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.states.generational_state_fact import (
     AlbatrossGenerationStateFact,
     StateFact,
+    build_state_fact,
     convert_to_albatross,
-    state_fact_generations,
 )
 from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
@@ -93,9 +93,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             if param_value is not None:
                 raw_state_fact = json.loads(param_value)
 
-                raw_state_fact_version = raw_state_fact.get("_generation", None)
-                state_fact_class = state_fact_generations[raw_state_fact_version]
-                self._state_fact = state_fact_class.build_from_state(raw_state_fact)
+                self._state_fact = build_state_fact(raw_state_fact)
 
         return self._state_fact
 
@@ -129,7 +127,8 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         Every time a new value for the state is set, we save it in the parameter corresponding to it. And update
         the cached value.
         """
-        if self.state_fact is None:
+        state_fact = self.state_fact
+        if state_fact is None:
             # We don't have a state yet, so we build the object now
             self._state_fact = AlbatrossGenerationStateFact(
                 state=value,
@@ -140,14 +139,14 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         else:
             # We already have a state, we make sure it is of the latest generation
             # then we update the values that need to be updated.
-            self._state_fact = convert_to_albatross(self._state_fact)
+            self._state_fact = convert_to_albatross(state_fact)
             self._state_fact.state = value
             self._state_fact.updated_at = (
                 datetime.datetime.now().astimezone()
             )  # Make our date timezone-aware
             self._state_fact.config_hash = self.config_hash
 
-        self._param_client.set(self._state_fact.json())
+        self._param_client.set(self._state_fact.json(by_alias=True))
 
         self._state = value
 
