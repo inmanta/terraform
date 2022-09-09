@@ -196,6 +196,82 @@ async def test_create_failed(
 
 
 @pytest.mark.terraform_provider_local
+async def test_state_upgrade(
+    project: Project,
+    server: Server,
+    client: Client,
+    environment: str,
+    agent_factory: Callable[
+        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
+    ],
+    function_temp_dir: str,
+    cache_agent_dir: str,
+) -> None:
+    file_path_object = Path(function_temp_dir) / Path("test-file.txt")
+
+    provider = LocalProvider()
+    local_file = LocalFile(
+        "my file", str(file_path_object), "my original content", provider
+    )
+
+    await agent_factory(
+        environment=environment,
+        hostname="node1",
+        agent_map={provider.agent: "localhost"},
+        code_loader=False,
+        agent_names=[provider.agent],
+    )
+
+    def model(purged: bool = False) -> str:
+        m = (
+            "\nimport terraform\n\n"
+            + provider.model_instance("provider")
+            + "\n"
+            + local_file.model_instance("file", purged)
+        )
+        LOGGER.info(m)
+        return m
+
+    assert not file_path_object.exists()
+
+    # Create
+    create_model = model()
+
+    project.compile(create_model)
+    resource: Resource = project.get_resource(
+        local_file.resource_type, resource_name="my file"
+    )
+
+    assert resource is not None
+
+    assert (
+        await local_file.get_state(client, environment) is None
+    ), "There shouldn't be any state set at this point for this resource"
+
+    assert (
+        await deploy_model(project, create_model, client, environment)
+        == VersionState.success
+    )
+
+    param = await local_file.get_state(client, environment)
+    assert param is not None, "A state should have been set by now"
+    assert param["__state_dict_generation"] == "Albatross"
+
+    # Let's overwrite the state with the old format now
+    await local_file.set_state(client, environment, param["state"])
+
+    # We run the deploy once more, it should update the state
+    assert (
+        await deploy_model(project, create_model, client, environment, full_deploy=True)
+        == VersionState.success
+    )
+
+    param = await local_file.get_state(client, environment)
+    assert param is not None, "A state should have been set by now"
+    assert param["__state_dict_generation"] == "Albatross"
+
+
+@pytest.mark.terraform_provider_local
 async def test_update_failed(
     project: Project,
     server: Server,
@@ -206,7 +282,7 @@ async def test_update_failed(
     ],
     function_temp_dir: str,
     cache_agent_dir: str,
-):
+) -> None:
     """
     This test creates a file, then update it by moving it in a forbidden location.  The update should fail
     but the param containing the state should be updated anyway, showing the current file state, which is null.
