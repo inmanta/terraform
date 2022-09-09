@@ -105,9 +105,8 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         cached value is None.  This means that the value seen by this object can only be altered by this object.
         """
         if self._state is None:
-            self._state = (
-                self.state_fact.get_state() if self.state_fact is not None else None
-            )
+            state_fact = self.state_fact
+            self._state = state_fact.get_state() if state_fact is not None else None
 
         return self._state
 

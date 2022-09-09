@@ -18,7 +18,7 @@
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
 from inmanta.ast import OptionalValueException
@@ -31,6 +31,7 @@ from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
+from inmanta_plugins.terraform.states import generational_state_fact
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +39,17 @@ LOGGER = logging.getLogger(__name__)
 # This dict contains all resource state parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
 resource_states: dict[str, dict] = dict()
+
+
+class UnknownStateException(RuntimeError):
+    """
+    This exception is raised whenever we try to get a state dict from the orchestrator
+    parameters, but it can't be found.  This should always be handled plugins, it should
+    not be exposed to the model.
+    """
+
+    def __init__(self, unknown: Unknown) -> None:
+        self.unknown = unknown
 
 
 def inmanta_reset_state() -> None:
@@ -85,9 +97,12 @@ def resource_attribute_reference(
 
 def get_last_resource_parameter(
     context: Context, resource: DynamicProxy, param_id: str, cache_dict: dict[str, dict]
-) -> Union[dict, Unknown]:
+) -> dict:
     """
     Helper method to get the dict params from server or cache (if it is there).
+
+    :returns: The state dict found in parameters
+    :raises: UnknownStateException if the state dict is not found in parameters
     """
     resource_id = inmanta.resources.to_id(resource)
 
@@ -119,7 +134,7 @@ def get_last_resource_parameter(
                 "source": "fact",
             }
         )
-        return Unknown(source=resource)
+        raise UnknownStateException(Unknown(source=resource))
 
     resource_parameter_dict = json.loads(resource_config_raw)
     cache_dict.setdefault(resource_id, resource_parameter_dict)
@@ -127,29 +142,25 @@ def get_last_resource_parameter(
     return resource_parameter_dict
 
 
-@plugin
 def get_last_resource_state(
     context: Context,
-    resource: "terraform::Resource",  # type: ignore
-) -> "dict":
+    resource: DynamicProxy,  # type: ignore
+) -> generational_state_fact.StateFact:
     """
     Get the last version of the state of a resource.  This is the version which
-    got deployed in the latest deployment of the resource.  It is in sync with
-    the resource config.
-
-    The returned dict has two keys:
-      - "tag": A tag which should match the tag of the config dict that was used
-        in the same deployment this state was produced.
-      - "state": The actual state dict
+    got deployed in the latest deployment of the resource.
     """
     global resource_states
 
-    return get_last_resource_parameter(
+    param = get_last_resource_parameter(
         context=context,
         resource=resource,
         param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
         cache_dict=resource_states,
     )
+
+    # Build the state fact object
+    return generational_state_fact.build_state_fact(param)
 
 
 @plugin
@@ -171,14 +182,15 @@ def get_resource_attribute(
     :param resource: The resource we which to get an attribute from.
     :param attribute_path: The path, in the resource state dict, to the desired value.
     """
-    resource_state_wrapper = get_last_resource_state(
-        context=context,
-        resource=resource,
-    )
-    if isinstance(resource_state_wrapper, Unknown):
-        return resource_state_wrapper
+    try:
+        resource_state_wrapper = get_last_resource_state(
+            context=context,
+            resource=resource,
+        )
+    except UnknownStateException as e:
+        return e.unknown
 
-    resource_state = resource_state_wrapper["state"]
+    resource_state = resource_state_wrapper.get_state()
     attribute_reference = resource_attribute_reference(resource, attribute_path)
     return attribute_reference.extract_from_state(resource_state)
 
@@ -216,7 +228,6 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
     # Build the base dict, containing all the attribute of this block
     d = {k: v for k, v in config_block.attributes.items()}
 
-    sets: Dict[str, List[Any]] = defaultdict(list)
     lists: Dict[str, Dict[str, Any]] = defaultdict(dict)
     dicts: Dict[str, Dict[str, Any]] = defaultdict(dict)
 
@@ -234,13 +245,9 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
             d[child.name] = child._config
 
-        elif child.nesting_mode == "set":
-            sets[child.name].append(child._config)
-
-        elif child.nesting_mode == "list":
-            if child.key is None:
-                raise PluginException("Nesting type dict requires the key to be set")
-
+        elif child.nesting_mode in ["set", "list"]:
+            # We will consider each set as a list, sorted with the generated key
+            # This allows us to generate the config consistently
             if child.key in lists[child.name]:
                 raise PluginException(
                     f"Can not set key-value pair {child.key}={child._config} as key is already "
@@ -262,12 +269,11 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
             dicts[child.name][child.key] = child._config
 
         else:
-            raise PluginException(f"Uknown nesting type: {child.nesting_mode}")
+            raise PluginException(f"Unknown nesting type: {child.nesting_mode}")
 
     # Check for all the dicts we will join that the keys sets don't intersect
     dict_sets: List[Tuple[str, dict]] = [
         ("single", d),
-        ("sets", sets),
         ("lists", lists),
         ("dicts", dicts),
     ]
@@ -285,10 +291,6 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
                     f"unmatching types: {dict_set_name_a}={dict_set_a} "
                     f"and {dict_set_name_b}={dict_set_b}"
                 )
-
-    # Add all the unordered lists (sets) to the config
-    for key, s in sets.items():
-        d[key] = s
 
     # Add all the ordered lists to the config
     for key, l in lists.items():
@@ -313,21 +315,22 @@ def safe_resource_state(
     case, raise an Unknown value, as the state is out of sync and is dangerous
     to use.
     """
-    current_config_hash = resource_config_hash(resource)
+    try:
+        previous_state_wrapper = get_last_resource_state(context, resource)
+    except UnknownStateException as e:
+        return e.unknown
 
-    previous_state_wrapper = get_last_resource_state(context, resource)
-    if isinstance(previous_state_wrapper, Unknown):
-        return previous_state_wrapper
-
-    previous_state_config_hash = previous_state_wrapper["config_hash"]
-
-    if previous_state_config_hash != current_config_hash:
+    current_config_hash = utils.dict_hash(resource.config)
+    if (
+        generational_state_fact.convert_to_albatross(previous_state_wrapper).config_hash
+        != current_config_hash
+    ):
         # The config and the state we have in cache are out of sync, it is
-        # unsafe to use, so we raise an Unknown
+        # unsafe to use, so we return an Unknown
         return Unknown(source=resource)
 
     # We can safely get the state
-    return previous_state_wrapper["state"]
+    return previous_state_wrapper.get_state()
 
 
 @plugin
@@ -473,5 +476,5 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
 
 @plugin
-def resource_config_hash(resource: "terraform::Resource") -> "string":  # type: ignore
-    return utils.dict_hash(DynamicProxy.unwrap(resource.config))
+def dict_hash(input: "dict") -> "string":  # type: ignore
+    return utils.dict_hash(input)

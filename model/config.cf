@@ -54,7 +54,7 @@ entity Block:
         the different element of the list.  (Siblings of this element)
         If it is a dict, the key attribute should be set, and will be used to place
         the element in the dict named after the name of this block.
-    :attr key: The key, required for list and dict nesting mode, ignored otherwise.
+    :attr key: The key, required for list and dict nesting mode, automatically set otherwise.
     :attr _config: Generated, the serialized version of this config.
     :attr _state: Generated, the current state for the resource attached to this config
         block.  The state here matches the same element as this config block.
@@ -135,7 +135,7 @@ entity Block:
     bool deprecated = false
 
     nesting_mode_t nesting_mode = "single"
-    string? key = null
+    string key
 
     dict _config
     dict _state
@@ -143,6 +143,17 @@ end
 
 
 Block.parent [0:1] -- Block.children [0:]
+
+
+implementation generate_key for Block:
+    """
+    Automatically generate the key for blocks that don't require it
+    to be set.  This key will be a hash of the block's config and can
+    then be used to order the block and generate a consistent config
+    even with unordered sets of children blocks. (e.a. nesting_mode=set)
+    """
+    self.key = dict_hash(self._config)
+end
 
 
 implementation serialize for Block:
@@ -171,6 +182,7 @@ implementation deprecation_warning for Block:
 end
 
 
+implement Block using generate_key when not self.nesting_mode in ["list", "dict"]
 implement Block using serialize
 implement Block using build_state when self.name is defined
 implement Block using deprecation_warning when self.deprecated

@@ -79,7 +79,7 @@
         ..code-block:: python
 
             @state_converter(BuboGenerationStateFact)
-            def convert_to_albatross(
+            def convert_to_bubo(
                 current_state_fact: StateFact,
             ) -> typing.Optional[BuboGenerationStateFact]:
                 albatross_state_fact = convert_to_albatross(current_state_fact)
