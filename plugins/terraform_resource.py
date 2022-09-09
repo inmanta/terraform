@@ -20,7 +20,6 @@ import copy
 import json
 import os
 import tempfile
-import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -116,7 +115,6 @@ class TerraformResourceHandler(CRUDHandler):
         self._resource_client: Optional[TerraformResourceClient] = None
         self.log_file_path = ""
         self.private_file_path = ""
-        self.deployment_tag = str(uuid.uuid4())
 
     @property
     def resource_client(self) -> TerraformResourceClient:
@@ -203,8 +201,6 @@ class TerraformResourceHandler(CRUDHandler):
          - Ensure we have a state file
          - Start the provider process
         """
-        self.deployment_tag = str(uuid.uuid4())
-
         provider_installer = ProviderInstaller(
             namespace=resource.provider_namespace,
             type=resource.provider_type,

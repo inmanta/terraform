@@ -27,6 +27,7 @@ from inmanta.execute.proxy import DictProxy, DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
+from inmanta.util import api_boundary_json_encoder
 from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
@@ -320,7 +321,9 @@ def safe_resource_state(
     except UnknownStateException as e:
         return e.unknown
 
-    current_config_hash = utils.dict_hash(resource.config)
+    current_config_hash = utils.dict_hash(
+        resource.config, default_encoder=api_boundary_json_encoder
+    )
     if (
         generational_state_fact.convert_to_albatross(previous_state_wrapper).config_hash
         != current_config_hash
@@ -477,4 +480,4 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
 @plugin
 def dict_hash(input: "dict") -> "string":  # type: ignore
-    return utils.dict_hash(input)
+    return utils.dict_hash(input, api_boundary_json_encoder)

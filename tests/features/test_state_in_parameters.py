@@ -15,7 +15,6 @@
 
     Contact: code@inmanta.com
 """
-import json
 import logging
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -83,7 +82,10 @@ async def test_store(
         local_file.resource_type, resource_name="my file"
     )
     entity = project.get_instances(local_file.resource_type)[0]
-    config_hash = project.get_plugin_function("resource_config_hash")(entity)
+
+    from inmanta_plugins.terraform import dict_hash
+
+    config_hash = dict_hash(entity.config)
 
     assert resource is not None
 
@@ -98,7 +100,7 @@ async def test_store(
 
     state = await local_file.get_state(client, environment)
     assert state is not None, "A state should have been set by now"
-    assert json.loads(state)["config_hash"] == config_hash
+    assert state["config_hash"] == config_hash
 
     # Delete
     delete_model = model(True)

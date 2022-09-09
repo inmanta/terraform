@@ -234,7 +234,7 @@ async def test_non_existing_network(
     assert docker_client.networks(test_network)
 
     # Save the network id
-    network.terraform_id = last_state["id"]
+    network.terraform_id = last_state["state"]["id"]
 
     # Delete the network
     docker_client.remove_network(network.terraform_id)
@@ -257,7 +257,7 @@ async def test_non_existing_network(
 
     last_state = await network.get_state(client, environment)
     assert last_state is not None
-    network.terraform_id = last_state["id"]
+    network.terraform_id = last_state["state"]["id"]
 
     assert docker_client.networks(test_network)
 
@@ -295,7 +295,7 @@ async def test_non_existing_network(
 
     last_state = await network.get_state(client, environment)
     assert last_state is not None
-    network.terraform_id = last_state["id"]
+    network.terraform_id = last_state["state"]["id"]
 
     assert docker_client.networks(test_network)
 
