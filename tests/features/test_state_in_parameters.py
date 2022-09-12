@@ -479,12 +479,16 @@ async def test_state_extraction(
     # The first compile allows us to get the config hash for the tree we built
     await off_main_thread(lambda: project.compile(base_model + "\n" + fake_config))
     root_config = project.get_instances("terraform::Resource")[0].root_config
+    holder = project.get_instances("__config__::Holder")[0]
     config_hash = (
         root_config.key
     )  # For "single" config blocks, the key is a hash of the config
 
     with pytest.raises(inmanta.execute.proxy.UnknownException):
         root_config._state  # The state should be unknown for now
+
+    with pytest.raises(inmanta.execute.proxy.UnknownException):
+        holder.physiology._state  # The state should be unknown as well on the child config blocks
 
     # The state should be unknown as we can not safely
 
