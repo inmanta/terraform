@@ -26,7 +26,6 @@ from inmanta_plugins.terraform.states.generational_state_fact import (
     AlbatrossGenerationStateFact,
     StateFact,
     build_state_fact,
-    convert_to_albatross,
 )
 from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
@@ -138,7 +137,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         else:
             # We already have a state, we make sure it is of the latest generation
             # then we update the values that need to be updated.
-            self._state_fact = convert_to_albatross(state_fact)
+            self._state_fact = AlbatrossGenerationStateFact.convert(state_fact)
             self._state_fact.state = value
             self._state_fact.updated_at = (
                 datetime.datetime.now().astimezone()

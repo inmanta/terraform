@@ -28,10 +28,6 @@
         from the stored state dict.
     2.  build_state_fact function, it allows to easily reconstruct a state fact object,
         from its state fact dict.
-    3.  State converters, those are functions, which will always output the same type of
-        state fact, based one whatever state fact generation they received in argument.
-        Those are wrapped by a decorator, state_converter, which takes as argument the
-        desired output type.
 
     How to use it:
     --------------
@@ -48,7 +44,7 @@
         ..code-block:: python
 
             # Works like this until their is a newer generation than Albatross
-            state_fact = convert_to_albatross(state_fact)
+            state_fact = AlbatrossGenerationStateFact.convert(state_fact)
 
     How to extend it:
     -----------------
@@ -58,12 +54,21 @@
         ..code-block:: python
 
             class BuboGenerationStateFact(GenerationalStateFact):
-                generation: str = "Bubo"
                 state: dict
                 config_hash: str
 
-                def get_state(self) -> dict:
-                    return self.state
+                @classmethod
+                def generation(cls) -> str:
+                    return "Bubo"
+
+                @classmethod
+                def _convert(cls, state: StateFact) -> typing.Optional["BuboGenerationStateFact"]:
+                    albatross_state_fact = AlbatrossGenerationStateFact.convert(state)
+                    return BuboGenerationStateFact(
+                        state=albatross_state_fact.state,
+                        config_hash=albatross_state_fact.config_hash,
+                    )
+
 
     2.  Register the new generation into the state_fact_generations dict:
 
@@ -71,22 +76,8 @@
 
             state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
                 ...,
-                BuboGenerationStateFact.generation: BuboGenerationStateFact,
+                BuboGenerationStateFact.generation(): BuboGenerationStateFact,
             }
-
-    3.  Create the state_transfer function to upgrade to your new generation:
-
-        ..code-block:: python
-
-            @state_converter(BuboGenerationStateFact)
-            def convert_to_bubo(
-                current_state_fact: StateFact,
-            ) -> typing.Optional[BuboGenerationStateFact]:
-                albatross_state_fact = convert_to_albatross(current_state_fact)
-                return BuboGenerationStateFact(
-                    state=albatross_state_fact.state,
-                    config_hash=albatross_state_fact.config_hash,
-                )
 
 """
 import abc
@@ -116,6 +107,28 @@ class StateFact(pydantic.BaseModel):
         instance of the subclass, constructed with the provided state dict.
         """
 
+    @abc.abstractclassmethod
+    def _convert(cls: typing.Type[SF], state: "StateFact") -> typing.Optional[SF]:
+        """
+        Convert any input state received in argument to this class type of state.
+        If the conversion is not possible, it should return None or raise a ValueError.
+        """
+
+    @classmethod
+    def convert(cls: typing.Type[SF], state: "StateFact") -> SF:
+        if isinstance(state, cls):
+            # The current state fact is the targeted one, no need to dig further
+            return state
+
+        # We call the converter function
+        result = cls._convert(state)
+        if result is None:
+            # This means the conversion has failed
+            raise ValueError(f"Can not convert {type(state)} to {cls}.")
+
+        # The result is the object we wanted, we simply return it
+        return result
+
 
 class LegacyStateFact(StateFact):
     """
@@ -132,6 +145,13 @@ class LegacyStateFact(StateFact):
     @classmethod
     def build_from_state(cls, state: dict) -> "LegacyStateFact":
         return cls(state=state)
+
+    @classmethod
+    def _convert(cls, state: StateFact) -> typing.Optional["LegacyStateFact"]:
+        """
+        The legacy state fact should not be the desired type for any conversion
+        """
+        return None
 
 
 class GenerationalStateFact(StateFact):
@@ -185,6 +205,22 @@ class AlbatrossGenerationStateFact(GenerationalStateFact):
     def generation(cls) -> str:
         return "Albatross"
 
+    @classmethod
+    def _convert(
+        cls, state: StateFact
+    ) -> typing.Optional["AlbatrossGenerationStateFact"]:
+        """
+        The only source state fact we know how to recover from is the legacy one.  So we
+        "convert" the input state fact to the legacy one and then upgrade it.
+        """
+        legacy_state_fact = LegacyStateFact.convert(state)
+        return AlbatrossGenerationStateFact(
+            state=legacy_state_fact.state,
+            created_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
+            updated_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
+            config_hash="",
+        )
+
 
 state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
     None: LegacyStateFact,
@@ -211,80 +247,3 @@ def build_state_fact(raw_state: dict) -> StateFact:
 
     # Build the state fact and return it
     return state_fact_class.build_from_state(raw_state)
-
-
-def state_converter(
-    target: typing.Type[SF],
-) -> typing.Callable[
-    [typing.Callable[[StateFact], typing.Optional[SF]]],
-    typing.Callable[[StateFact], SF],
-]:
-    """
-    The state_converter function is a decorator to help build efficient and elegant state fact
-    object converters.
-    """
-
-    def wrap_state_converter(
-        state_converter: typing.Callable[[StateFact], typing.Optional[SF]]
-    ) -> typing.Callable[[StateFact], SF]:
-        """
-        This inner function is returned when using the decorator with an argument.  This is the
-        actual decorator, which received the function it decorates as argument.
-        """
-
-        def state_converter_replacement(current_state_fact: StateFact) -> SF:
-            """
-            This is the replacement function for the function we decorate.  It does the
-            following things when called:
-            1. Check whether the input matches the target type, if so, we return the input
-            2. Call the converter function we replace and check its output
-            2a. The output is None, we failed to do the conversion, and raise an Exception
-            2b. The output is not None, it must be of the target type, we return it
-            """
-            if isinstance(current_state_fact, target):
-                # The current state fact is the target one, no need to dig further
-                return current_state_fact
-
-            # We call the converter function
-            result = state_converter(current_state_fact)
-            if result is None:
-                # This means the conversion has failed
-                raise ValueError(
-                    f"Can not convert {type(current_state_fact)} to {type(target)} using {state_converter}"
-                )
-
-            # The result is the object we wanted, we simply return it
-            return result
-
-        return state_converter_replacement
-
-    return wrap_state_converter
-
-
-@state_converter(LegacyStateFact)
-def convert_to_legacy(
-    current_state_fact: StateFact,
-) -> typing.Optional[LegacyStateFact]:
-    """
-    The legacy converter is a bit special.  The only state fact we know how to handle
-    if the legacy one, which will be detected by the decorator and returned directly.
-    No conversion logic to add here.
-    """
-    return None
-
-
-@state_converter(AlbatrossGenerationStateFact)
-def convert_to_albatross(
-    current_state_fact: StateFact,
-) -> typing.Optional[AlbatrossGenerationStateFact]:
-    """
-    The only source state fact we know how to recover from is the legacy one.  So we
-    "convert" the input state fact to the legacy one and then upgrade it.
-    """
-    legacy_state_fact = convert_to_legacy(current_state_fact)
-    return AlbatrossGenerationStateFact(
-        state=legacy_state_fact.state,
-        created_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
-        updated_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
-        config_hash="",
-    )

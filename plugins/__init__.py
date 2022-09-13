@@ -325,7 +325,9 @@ def safe_resource_state(
         resource.config, default_encoder=api_boundary_json_encoder
     )
     if (
-        generational_state_fact.convert_to_albatross(previous_state_wrapper).config_hash
+        generational_state_fact.AlbatrossGenerationStateFact.convert(
+            previous_state_wrapper
+        ).config_hash
         != current_config_hash
     ):
         # The config and the state we have in cache are out of sync, it is
