@@ -104,7 +104,7 @@ class TerraformResource(PurgeableResource):
 
     @staticmethod
     def get_resource_config(exporter, entity) -> dict:
-        return {key: value for key, value in entity.config.items() if value is not None}
+        return {key: value for key, value in entity.config.items()}
 
 
 @provider("terraform::Resource", name="terraform-resource")
