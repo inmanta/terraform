@@ -435,30 +435,6 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
 
 
 @plugin
-def get_from_unknown_dict(object: "dict", key: "string") -> "any":  # type: ignore
-    """
-    Safely get a value in a dict that could be an Unknown object.
-    If an Unknown is met instead of the dict, the Unknown object
-    is passed along.
-    """
-    if isinstance(object, Unknown):
-        return object
-    return object[key]
-
-
-@plugin
-def get_from_unknown_list(object: "list", index: "int") -> "any":  # type: ignore
-    """
-    Safely get an item in a list that could be an Unknown object.
-    If an Unknown is met instead of the list, the Unknown object
-    is passed along.
-    """
-    if isinstance(object, Unknown):
-        return object
-    return object[index]
-
-
-@plugin
 def deprecated_config_block(config_block: "terraform::config::Block") -> None:  # type: ignore
     """
     Log a warning for the usage of a deprecated config block
