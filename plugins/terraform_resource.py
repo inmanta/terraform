@@ -104,7 +104,7 @@ class TerraformResource(PurgeableResource):
 
     @staticmethod
     def get_resource_config(exporter, entity) -> dict:
-        return {key: value for key, value in entity.config.items()}
+        return entity.config
 
 
 @provider("terraform::Resource", name="terraform-resource")
@@ -332,7 +332,7 @@ class TerraformResourceHandler(CRUDHandler):
         # config recursively.  We don't do it as it would be really complicate to
         # get the diff in lists and sets correctly.
         # This might get solved by https://github.com/inmanta/terraform/issues/7
-        resource.resource_config = {
+        resource.resource_config = { # TODO !!!!!
             k: current_state.get(k) for k in desired_state.keys()
         }
 
