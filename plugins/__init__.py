@@ -17,6 +17,7 @@
 """
 import json
 import logging
+import warnings
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,6 +29,7 @@ from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
 from inmanta.util import api_boundary_json_encoder
+from inmanta.warnings import InmantaWarning
 from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
@@ -40,6 +42,13 @@ LOGGER = logging.getLogger(__name__)
 # This dict contains all resource state parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
 resource_states: dict[str, dict] = dict()
+
+
+class InmantaDeprecationWarning(DeprecationWarning, InmantaWarning):
+    """
+    This class can be used to warn about a deprecated part of the module.
+    It is both an inmanta warning and a deprecation warning.
+    """
 
 
 class UnknownStateException(RuntimeError):
@@ -134,6 +143,9 @@ def get_last_resource_parameter(
                 "parameter": param_id,
                 "source": "fact",
             }
+        )
+        LOGGER.debug(
+            f"Can not find a state for resource {inmanta.resources.to_id(resource)} in environment {environment}"
         )
         raise UnknownStateException(Unknown(source=resource))
 
@@ -332,6 +344,9 @@ def safe_resource_state(
     ):
         # The config and the state we have in cache are out of sync, it is
         # unsafe to use, so we return an Unknown
+        LOGGER.debug(
+            f"Config hash for {inmanta.resources.to_id(resource)} (={current_config_hash}) doesn't match the current state"
+        )
         return Unknown(source=resource)
 
     # We can safely get the state
@@ -411,8 +426,9 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
                 f"{parent_state} ({type(parent_state)})"
             )
 
-        # This is our config dict, minus all the default (null) values
-        clean_config = {k: v for k, v in config._config.items() if v is not None}
+        # This is our attributes dict, minus all the default (null) values
+        # We don't consider values which are not attributes
+        clean_config = {k: v for k, v in config.attributes.items() if v is not None}
 
         matching_states: list[DictProxy] = []
         for candidate_state in state_container:
@@ -424,10 +440,13 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
                 matching_states.append(candidate_state)
 
         if len(matching_states) != 1:
-            raise PluginException(
-                f"Failed to find a unique matching state in the list {state_container} for config "
-                f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
+            warnings.warn(
+                InmantaWarning(
+                    f"Failed to find a unique matching state in the list {state_container} for config "
+                    f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
+                )
             )
+            return Unknown(object())
 
         return matching_states[0]
 
@@ -451,8 +470,10 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
     config_path_str = ".".join(reversed(config_path))
 
-    LOGGER.warning(
-        f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+    warnings.warn(
+        InmantaDeprecationWarning(
+            f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+        )
     )
 
 
