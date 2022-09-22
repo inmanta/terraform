@@ -141,12 +141,12 @@ def test_deprecated_config(project: Project) -> None:
 
     desired_logs = {
         (
-            "inmanta_plugins.terraformWARNING The usage of config '' at "
+            "inmanta.warnings         WARNING InmantaDeprecationWarning: The usage of config '' at "
             f"{project._test_project_dir}/main.cf:3 is deprecated"
         ),
         (
             # prior to https://github.com/inmanta/inmanta-core/commit/64798acc8abcc3b7b31ab657f1d04e1974209d6f
-            "inmanta_plugins.terraformWARNING The usage of config '' at "
+            "inmanta.warnings         WARNING InmantaDeprecationWarning: The usage of config '' at "
             "./main.cf:3 is deprecated"
         ),
     }
