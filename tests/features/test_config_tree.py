@@ -234,7 +234,7 @@ async def test_block_config(
                 }},
             ),
         )
-        res_1_id = terraform::get_from_unknown_dict(res_1.root_config._state, "id")
+        res_1_id = res_1.root_config._state["id"]
 
         res_2 = terraform::Resource(
             type="local_file",
@@ -252,7 +252,7 @@ async def test_block_config(
                 }},
             ),
         )
-        res_2_id = terraform::get_from_unknown_dict(res_2.root_config._state, "id")
+        res_2_id = res_2.root_config._state["id"]
 
         res_3 = terraform::Resource(
             type="local_file",
@@ -270,7 +270,7 @@ async def test_block_config(
                 }},
             ),
         )
-        res_3_id = terraform::get_from_unknown_dict(res_3.root_config._state, "id")
+        res_3_id = res_3.root_config._state["id"]
     """
 
     first_model = model % dict(first_file_content="test")
