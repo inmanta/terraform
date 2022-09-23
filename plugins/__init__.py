@@ -480,3 +480,8 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 @plugin
 def dict_hash(input: "dict") -> "string":  # type: ignore
     return utils.dict_hash(input, api_boundary_json_encoder)
+
+
+@plugin
+def sorted_list(input_list: "list") -> "list":
+    return sorted(input_list)
