@@ -1,5 +1,5 @@
 inmanta-dev-dependencies[module,extension]==1.76.0; python_version <= '3.6'
-inmanta-dev-dependencies[module,extension]==2.36.0; python_version > '3.6'
+inmanta-dev-dependencies[module,extension]==2.37.0; python_version > '3.6'
 pytest
 netaddr
 cpapi
