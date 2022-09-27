@@ -113,6 +113,7 @@ This feature is supported with three different implementations, which all have a
        2. The value can be used anywhere in the model, not only for terraform resources configs.
     2. Disadvantages:
        1. As the value is resolved at compile time, the value we get always comes from the last deployment, not the one to come (obviously).
+       2. There is no safety mechanism to ensure that the value we received from state is still relevant (i.e. if we update the config of entity a, and use its previous state in the model, the state value might not be relevant anymore by the time we reach the deployment).
  2. `terraform::get_resource_attribute_ref(resource, ["id"])`: returns a reference to the value, it can not be manipulated, only assigned in another resource config dict.
     1. Advantages:
        1. It doesn't require multiple compile to resolve the value.
@@ -125,8 +126,9 @@ This feature is supported with three different implementations, which all have a
        1. You can actually access any part of the state dict, not only elements at the root of the config tree.
        2. The access to the state elements is easy and safe, there is a safety mechanism that checks that this states corresponds to the version of the config currently in use in the model.
     2. Disadvantages:
-       1. Every time you update the config, there will always be a second compile with the updated state dict, even if you don't use it.
-       2. This makes the model much more complex for the compiler, it *might* not scale very well (untested).
+       1. As the value is resolved at compile time, the value we get always comes from the last deployment, not the one to come (obviously).
+       2. Every time you update the config, there will always be a second compile with the updated state dict, even if you don't use it.
+       3. This makes the model much more complex for the compiler, it *might* not scale very well (untested).
 
 **Behavioral notes:**
 | Situation | First solution, direct access | Second solution, reference access | Third solution, direct access |
