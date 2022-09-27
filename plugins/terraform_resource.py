@@ -332,8 +332,9 @@ class TerraformResourceHandler(CRUDHandler):
         # config recursively.  We don't do it as it would be really complicate to
         # get the diff in lists and sets correctly.
         # This might get solved by https://github.com/inmanta/terraform/issues/7
-        resource.resource_config = {  # TODO !!!!!
-            k: current_state.get(k) for k in desired_state.keys()
+        resource.resource_config = {
+            k: current_state.get(k) if v is not None else v
+            for k, v in desired_state.items()
         }
 
         ctx.debug(
