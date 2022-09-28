@@ -1,6 +1,9 @@
 # Changelog
 
-## 1.3.0 - ?
+## 1.3.1 - ?
+- 
+
+## 1.3.0 - 28/09/2022
 - Attach state to config blocks automatically.
 - Fix repair issue when resource has been deleted (introduced in 1.2.1)
 
