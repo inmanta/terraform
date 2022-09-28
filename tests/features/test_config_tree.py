@@ -15,6 +15,7 @@
 
     Contact: code@inmanta.com
 """
+import json
 import logging
 import subprocess
 import sys
@@ -23,12 +24,12 @@ from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
 import pytest
-from helpers.utils import deploy_model
+from helpers.utils import deploy_model, get_param
 from pytest_inmanta.plugin import Project
 
 from inmanta.agent.agent import Agent
-from inmanta.const import VersionState
 from inmanta.protocol.endpoints import Client
+from inmanta.resources import Id
 from inmanta.server.protocol import Server
 
 LOGGER = logging.getLogger(__name__)
@@ -38,8 +39,8 @@ def test_config_serialization(project: Project):
     model = """
         import terraform::config
 
-        terraform::config::Block(
-            name="root",
+        config = terraform::config::Block(
+            name=null,
             attributes={"name": "Albert"},
             children=[
                 terraform::config::Block(
@@ -78,12 +79,13 @@ def test_config_serialization(project: Project):
                 )
             ],
             parent=null,
+            _state=config._config,
         )
     """
     project.compile(model, no_dedent=False)
 
     blocks = project.get_instances("terraform::config::Block")
-    root_block = next(iter(block for block in blocks if block.name == "root"))
+    root_block = next(iter(block for block in blocks if block.name is None))
 
     assert root_block._config["name"] == "Albert"
     assert root_block._config["pets"] == {
@@ -114,10 +116,11 @@ def test_deprecated_config(project: Project) -> None:
         import terraform::config
 
         terraform::config::Block(
-            name="root",
+            name=null,
             attributes={},
             deprecated=true,
             parent=null,
+            _state={},
         )
     """
 
@@ -138,12 +141,12 @@ def test_deprecated_config(project: Project) -> None:
 
     desired_logs = {
         (
-            "inmanta_plugins.terraformWARNING The usage of config 'root' at "
+            "inmanta.warnings         WARNING InmantaDeprecationWarning: The usage of config '' at "
             f"{project._test_project_dir}/main.cf:3 is deprecated"
         ),
         (
             # prior to https://github.com/inmanta/inmanta-core/commit/64798acc8abcc3b7b31ab657f1d04e1974209d6f
-            "inmanta_plugins.terraformWARNING The usage of config 'root' at "
+            "inmanta.warnings         WARNING InmantaDeprecationWarning: The usage of config '' at "
             "./main.cf:3 is deprecated"
         ),
     }
@@ -166,6 +169,8 @@ async def test_block_config(
     function_temp_dir: str,
     cache_agent_dir: str,
 ):
+    from inmanta_plugins.terraform.helpers import const, utils
+
     await agent_factory(
         environment=environment,
         hostname="node1",
@@ -174,13 +179,23 @@ async def test_block_config(
         agent_names=["hashicorp-local-2.1.0"],
     )
 
-    file_path_object = Path(function_temp_dir) / Path("test-file.txt")
+    async def get_param_short(resource_id: str) -> Optional[str]:
+        return await get_param(
+            environment=environment,
+            client=client,
+            param_id=const.TERRAFORM_RESOURCE_STATE_PARAMETER,
+            resource_id=resource_id,
+        )
+
+    file_path_object_1 = Path(function_temp_dir) / Path("test-file-1.txt")
+    file_path_object_2 = Path(function_temp_dir) / Path("test-file-2.txt")
+    file_path_object_3 = Path(function_temp_dir) / Path("test-file-3.txt")
 
     model = f"""
         import terraform
         import terraform::config
 
-        # Overwritting agent config to disable autostart.  Agents have to be started
+        # Overwriting agent config to disable autostart.  Agents have to be started
         # manually in the tests.
         prov_agent_config = std::AgentConfig(
             autostart=false,
@@ -198,35 +213,125 @@ async def test_block_config(
             agent_config=prov_agent_config,
             manual_config=false,
             root_config=terraform::config::Block(
-                name="root",
+                name=null,
                 attributes={{}},
             ),
         )
 
-        res = terraform::Resource(
+        res_1 = terraform::Resource(
             type="local_file",
-            name="test",
+            name="test1",
             purged=false,
             send_event=true,
             provider=prov,
             requires=prov,
             manual_config=false,
             root_config=terraform::config::Block(
-                name="root",
+                name=null,
                 attributes={{
-                    "filename": "{file_path_object}",
-                    "content": "test",
+                    "filename": "{file_path_object_1}",
+                    "content": "%(first_file_content)s",
                 }},
             ),
         )
+        res_1_id = res_1.root_config._state["id"]
+
+        res_2 = terraform::Resource(
+            type="local_file",
+            name="test2",
+            purged=false,
+            send_event=true,
+            provider=prov,
+            requires=prov,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name=null,
+                attributes={{
+                    "filename": "{file_path_object_2}",
+                    "content": "res_1.id={{{{ res_1_id }}}}",
+                }},
+            ),
+        )
+        res_2_id = res_2.root_config._state["id"]
+
+        res_3 = terraform::Resource(
+            type="local_file",
+            name="test3",
+            purged=false,
+            send_event=true,
+            provider=prov,
+            requires=prov,
+            manual_config=false,
+            root_config=terraform::config::Block(
+                name=null,
+                attributes={{
+                    "filename": "{file_path_object_3}",
+                    "content": "res_2.id={{{{ res_2_id }}}}",
+                }},
+            ),
+        )
+        res_3_id = res_3.root_config._state["id"]
     """
 
-    assert not file_path_object.exists()
+    first_model = model % dict(first_file_content="test")
+
+    assert not file_path_object_1.exists()
+    assert not file_path_object_2.exists()
+    assert not file_path_object_3.exists()
 
     # Create
-    assert (
-        await deploy_model(project, model, client, environment) == VersionState.success
-    )
+    await deploy_model(project, first_model, client, environment)
 
-    assert file_path_object.exists()
-    assert file_path_object.read_text("utf-8") == "test"
+    assert file_path_object_1.exists()
+    assert file_path_object_1.read_text("utf-8") == "test"
+    assert not file_path_object_2.exists()
+    assert not file_path_object_3.exists()
+
+    # Create next file (now that the id of the first exists)
+    await deploy_model(project, first_model, client, environment)
+
+    assert file_path_object_1.exists()
+    assert file_path_object_2.exists()
+    assert not file_path_object_3.exists()
+
+    # Create next file (now that the id of the second exists)
+    await deploy_model(project, first_model, client, environment)
+
+    assert file_path_object_1.exists()
+    assert file_path_object_2.exists()
+    assert file_path_object_3.exists()
+
+    # We remove the files manually, as this is an easy way of checking
+    # if the provider has deployed the resource or not
+    file_path_object_1.unlink()
+    file_path_object_2.unlink()
+    file_path_object_3.unlink()
+
+    second_model = model % dict(first_file_content="test2")
+
+    # Check that we have parameters set
+    first_file_resource = project.get_resource(
+        "terraform::Resource", resource_name="test1"
+    )
+    assert (
+        first_file_resource is not None
+    ), "Failed to find the resource for the first file"
+    first_file_resource_id = Id.resource_str(first_file_resource.id)
+    param = await get_param_short(first_file_resource_id)
+    assert param is not None, "The resource should still have a state"
+
+    # Check that the config hash is not the same now that we updated the dict
+    assert (
+        utils.dict_hash({"filename": str(file_path_object_1), "content": "test2"})
+        != json.loads(param)["config_hash"]
+    ), "The config hash should have changed since last deployment"
+
+    # Create once again, but this time we still have parameters set
+    # and the content of the first file has changed, which should block
+    # the deployment of the two other files
+    await deploy_model(project, second_model, client, environment)
+
+    assert file_path_object_1.exists()
+    assert file_path_object_1.read_text("utf-8") == "test2"
+    assert not file_path_object_2.exists()
+    assert not file_path_object_3.exists()

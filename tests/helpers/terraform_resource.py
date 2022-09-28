@@ -25,6 +25,7 @@ from uuid import UUID
 
 from helpers.terraform_provider import TerraformProvider
 
+from inmanta.const import ParameterSource
 from inmanta.data import model
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import Client
@@ -250,6 +251,25 @@ class TerraformResource:
             return action
 
         return None
+
+    async def set_state(self, client: Client, environment: UUID, state: dict) -> None:
+        """
+        Manually set a new state for this resource in the parameters of the server.
+        """
+        result = await client.set_param(
+            tid=environment,
+            id="terraform-resource-state",
+            source=ParameterSource.user,
+            value=json.dumps(state),
+            resource_id=str(self.id),
+            recompile=True,
+        )
+        if result.code == 200:
+            return
+
+        assert (
+            False
+        ), f"Bad response while trying to set parameter: {result.code}, {result.message}"
 
     async def get_state(self, client: Client, environment: UUID) -> Optional[dict]:
         """

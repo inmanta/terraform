@@ -33,6 +33,7 @@ from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PAR
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (
     build_resource_state,
+    dict_hash,
     parse_resource_state,
 )
 from inmanta_plugins.terraform.states.terraform_resource_state_inmanta import (
@@ -103,7 +104,7 @@ class TerraformResource(PurgeableResource):
 
     @staticmethod
     def get_resource_config(exporter, entity) -> dict:
-        return {key: value for key, value in entity.config.items() if value is not None}
+        return entity.config
 
 
 @provider("terraform::Resource", name="terraform-resource")
@@ -251,6 +252,7 @@ class TerraformResourceHandler(CRUDHandler):
             type_name=resource.resource_type,
             private_file_path=private_file_path,
             param_client=param_client,
+            config_hash=dict_hash(resource.resource_config),
         )
 
         self.provider = TerraformProvider(
@@ -269,6 +271,8 @@ class TerraformResourceHandler(CRUDHandler):
             ctx.logger,
         )
 
+        # The config can contain references to other resource attributes
+        # We resolve any of those now and update the resource_config
         resource.resource_config = build_resource_state(
             resource.resource_config,
             Client("agent"),
@@ -329,7 +333,8 @@ class TerraformResourceHandler(CRUDHandler):
         # get the diff in lists and sets correctly.
         # This might get solved by https://github.com/inmanta/terraform/issues/7
         resource.resource_config = {
-            k: current_state.get(k) for k in desired_state.keys()
+            k: current_state.get(k) if v is not None else v
+            for k, v in desired_state.items()
         }
 
         ctx.debug(

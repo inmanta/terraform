@@ -45,8 +45,14 @@ class TerraformResourceState:
         """
         self._type_name = type_name
         self._resource_id = resource_id
-        self._private = private
-        self._state = state
+
+        self._private: Optional[bytes] = None
+        if private is not None:
+            self.private = private
+
+        self._state: Optional[dict] = None
+        if state is not None:
+            self.state = state
 
     @property
     def type_name(self) -> str:

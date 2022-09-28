@@ -16,11 +16,17 @@
     Contact: code@inmanta.com
 """
 import base64
+import datetime
 import json
+import typing
 from pathlib import Path
-from typing import Optional
 
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
+from inmanta_plugins.terraform.states.generational_state_fact import (
+    AlbatrossGenerationStateFact,
+    StateFact,
+    build_state_fact,
+)
 from inmanta_plugins.terraform.tf.terraform_resource_state import TerraformResourceState
 
 
@@ -38,8 +44,9 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         *,
         private_file_path: str,
         param_client: ParamClient,
-        private: Optional[bytes] = None,
-        state: Optional[dict] = None,
+        config_hash: str,
+        private: typing.Optional[bytes] = None,
+        state: typing.Optional[dict] = None,
     ) -> None:
         """
         :attr type_name: The name that the provider give to this resource
@@ -47,6 +54,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             to store the private value of the resource.
         :attr param_client: A client that can be used to store the resource state in
             the orchestrator parameters.
+        :attr tag: A tag to mark this state.  It will be set alongside the state dict.
         :attr private: An initial private value for this resource
         :attr state: An initial state for this resource
         """
@@ -56,11 +64,13 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             private=private,
             state=state,
         )
+        self.config_hash = config_hash
         self._private_file_path = Path(private_file_path)
         self._param_client = param_client
+        self._state_fact: typing.Optional[StateFact] = None
 
     @property
-    def private(self) -> Optional[bytes]:
+    def private(self) -> typing.Optional[bytes]:
         """
         The private is any bytes value that the provider might give us, for giving it back on the next
         interaction with it.
@@ -73,16 +83,29 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         return self._private
 
     @property
-    def state(self) -> Optional[dict]:
+    def state_fact(self) -> typing.Optional[StateFact]:
+        """
+        Get the state fact object that has been saved in the orchestrator.
+        """
+        if self._state_fact is None:
+            param_value = self._param_client.get()
+            if param_value is not None:
+                raw_state_fact = json.loads(param_value)
+
+                self._state_fact = build_state_fact(raw_state_fact)
+
+        return self._state_fact
+
+    @property
+    def state(self) -> typing.Optional[dict]:
         """
         The state is a dictionary containing the current state of the resource.  It is stored in a parameter
         on the server.  When this property is called, we only request the parameter from the server if the
         cached value is None.  This means that the value seen by this object can only be altered by this object.
         """
         if self._state is None:
-            param_value = self._param_client.get()
-            if param_value is not None:
-                self._state = json.loads(param_value)
+            state_fact = self.state_fact
+            self._state = state_fact.get_state() if state_fact is not None else None
 
         return self._state
 
@@ -102,7 +125,26 @@ class TerraformResourceStateInmanta(TerraformResourceState):
         Every time a new value for the state is set, we save it in the parameter corresponding to it. And update
         the cached value.
         """
-        self._param_client.set(json.dumps(value))
+        state_fact = self.state_fact
+        if state_fact is None:
+            # We don't have a state yet, so we build the object now
+            self._state_fact = AlbatrossGenerationStateFact(
+                state=value,
+                created_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
+                updated_at=datetime.datetime.now().astimezone(),  # Make our date timezone-aware
+                config_hash=self.config_hash,
+            )
+        else:
+            # We already have a state, we make sure it is of the latest generation
+            # then we update the values that need to be updated.
+            self._state_fact = AlbatrossGenerationStateFact.convert(state_fact)
+            self._state_fact.state = value
+            self._state_fact.updated_at = (
+                datetime.datetime.now().astimezone()
+            )  # Make our date timezone-aware
+            self._state_fact.config_hash = self.config_hash
+
+        self._param_client.set(self._state_fact.json())
 
         self._state = value
 

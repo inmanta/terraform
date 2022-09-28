@@ -215,7 +215,7 @@ async def test_crud(
     previous_state = last_state
     last_state = await local_file.get_state(client, environment)
     assert last_state is not None
-    assert last_state == previous_state
+    assert last_state["state"] == previous_state["state"]
 
     # Update
     local_file.content = local_file.content + " (updated)"
@@ -232,7 +232,7 @@ async def test_crud(
     previous_state = last_state
     last_state = await local_file.get_state(client, environment)
     assert last_state is not None
-    assert last_state != previous_state
+    assert last_state["state"] != previous_state["state"]
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
@@ -252,7 +252,7 @@ async def test_crud(
     previous_state = last_state
     last_state = await local_file.get_state(client, environment)
     assert last_state is not None
-    assert last_state == previous_state
+    assert last_state["state"] == previous_state["state"]
 
     assert file_path_object.exists()
     assert file_path_object.read_text("utf-8") == local_file.content
@@ -374,7 +374,7 @@ async def test_failure(
 
     previous_state = last_state
     last_state = await local_file.get_state(client, environment)
-    assert last_state == previous_state
+    assert last_state["state"] == previous_state["state"]
 
     # Remove the existing file
     dir_path_object.chmod(0o770)

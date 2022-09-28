@@ -17,30 +17,53 @@
 """
 import json
 import logging
+import warnings
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import inmanta.resources
 from inmanta.ast import OptionalValueException
 from inmanta.config import Config
-from inmanta.execute.proxy import DynamicProxy, SequenceProxy
+from inmanta.execute.proxy import DictProxy, DynamicProxy, SequenceProxy
 from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
+from inmanta.util import api_boundary_json_encoder
+from inmanta.warnings import InmantaWarning
+from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
+from inmanta_plugins.terraform.states import generational_state_fact
 
 LOGGER = logging.getLogger(__name__)
 
 
-# This dict contains all resource parameter already queried for this compile run.
+# This dict contains all resource state parameter already queried for this compile run.
 # This avoids getting them multiple times if multiple entities use them.
-resource_states: Dict[str, Dict] = dict()
+resource_states: dict[str, dict] = dict()
+
+
+class InmantaDeprecationWarning(DeprecationWarning, InmantaWarning):
+    """
+    This class can be used to warn about a deprecated part of the module.
+    It is both an inmanta warning and a deprecation warning.
+    """
+
+
+class UnknownStateException(RuntimeError):
+    """
+    This exception is raised whenever we try to get a state dict from the orchestrator
+    parameters, but it can't be found.  This should always be handled plugins, it should
+    not be exposed to the model.
+    """
+
+    def __init__(self, unknown: Unknown) -> None:
+        self.unknown = unknown
 
 
 def inmanta_reset_state() -> None:
-    # Resetting the resource states dict between compiles
+    # Resetting the resource states and configs dict between compiles
     global resource_states
     resource_states = dict()
 
@@ -82,6 +105,77 @@ def resource_attribute_reference(
     )
 
 
+def get_last_resource_parameter(
+    context: Context, resource: DynamicProxy, param_id: str, cache_dict: dict[str, dict]
+) -> dict:
+    """
+    Helper method to get the dict params from server or cache (if it is there).
+
+    :returns: The state dict found in parameters
+    :raises: UnknownStateException if the state dict is not found in parameters
+    """
+    resource_id = inmanta.resources.to_id(resource)
+
+    cached_parameter_dict = cache_dict.get(resource_id)
+    if cached_parameter_dict is not None:
+        return cached_parameter_dict
+
+    environment = Config.get("config", "environment", None)
+    if environment is None:
+        raise PluginException(
+            "The environment for this model should be configured at this point"
+        )
+
+    # Cache miss, we continue
+    param_client = ParamClient(
+        environment=environment,
+        client=context.get_client(),
+        run_sync=lambda func: context.run_sync(func),  # type: ignore
+        param_id=param_id,
+        resource_id=resource_id,
+    )
+
+    resource_config_raw: Optional[str] = param_client.get()
+    if resource_config_raw is None:
+        unknown_parameters.append(
+            {
+                "resource": resource_id,
+                "parameter": param_id,
+                "source": "fact",
+            }
+        )
+        LOGGER.debug(
+            f"Can not find a state for resource {inmanta.resources.to_id(resource)} in environment {environment}"
+        )
+        raise UnknownStateException(Unknown(source=resource))
+
+    resource_parameter_dict = json.loads(resource_config_raw)
+    cache_dict.setdefault(resource_id, resource_parameter_dict)
+
+    return resource_parameter_dict
+
+
+def get_last_resource_state(
+    context: Context,
+    resource: DynamicProxy,  # type: ignore
+) -> generational_state_fact.StateFact:
+    """
+    Get the last version of the state of a resource.  This is the version which
+    got deployed in the latest deployment of the resource.
+    """
+    global resource_states
+
+    param = get_last_resource_parameter(
+        context=context,
+        resource=resource,
+        param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
+        cache_dict=resource_states,
+    )
+
+    # Build the state fact object
+    return generational_state_fact.build_state_fact(param)
+
+
 @plugin
 def get_resource_attribute(
     context: Context,
@@ -90,49 +184,28 @@ def get_resource_attribute(
 ) -> "any":  # type: ignore
     """
     Get a resource attribute from the saved parameters (facts).
+
+    Disclaimer: Whatever comes out of this method might not be very safe to use,
+        as it might be out of sync with the current state of the model.
+        i.e. If you access here the id of a file, which is modified in the same
+            model, the id you will receive will be the one of the previous file
+            not the one deployed in this model.
+        It is safer to use safe_resource_state plugin.
+
     :param resource: The resource we which to get an attribute from.
     :param attribute_path: The path, in the resource state dict, to the desired value.
     """
-    global resource_states
-
-    attribute_reference = resource_attribute_reference(resource, attribute_path)
-
-    # Trying to get resource value from cache to avoid unnecessary api calls
-    cached_state = resource_states.get(attribute_reference.resource_id)
-    if cached_state is not None:
-        # Cache hit, we get the attribute value and return it
-        try:
-            return attribute_reference.extract_from_state(cached_state)
-        except ValueError as e:
-            raise PluginException(str(e))
-
-    # Cache miss, we continue
-    param_client = ParamClient(
-        environment=attribute_reference.environment,
-        client=context.get_client(),
-        run_sync=lambda func: context.run_sync(func),  # type: ignore
-        param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
-        resource_id=attribute_reference.resource_id,
-    )
-
-    resource_state_raw: Optional[str] = param_client.get()
-    if resource_state_raw is None:
-        unknown_parameters.append(
-            {
-                "resource": attribute_reference.resource_id,
-                "parameter": TERRAFORM_RESOURCE_STATE_PARAMETER,
-                "source": "fact",
-            }
-        )
-        return Unknown(source=resource)
-
-    resource_state = json.loads(resource_state_raw)
-    resource_states.setdefault(attribute_reference.resource_id, resource_state)
-
     try:
-        return attribute_reference.extract_from_state(resource_state)
-    except ValueError as e:
-        raise PluginException(str(e))
+        resource_state_wrapper = get_last_resource_state(
+            context=context,
+            resource=resource,
+        )
+    except UnknownStateException as e:
+        return e.unknown
+
+    resource_state = resource_state_wrapper.get_state()
+    attribute_reference = resource_attribute_reference(resource, attribute_path)
+    return attribute_reference.extract_from_state(resource_state)
 
 
 @plugin
@@ -168,13 +241,15 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
     # Build the base dict, containing all the attribute of this block
     d = {k: v for k, v in config_block.attributes.items()}
 
-    sets: Dict[str, List[Any]] = defaultdict(list)
     lists: Dict[str, Dict[str, Any]] = defaultdict(dict)
     dicts: Dict[str, Dict[str, Any]] = defaultdict(dict)
 
     # For each children, we pick up the config and attach it to this dict.
     # Depending on the nesting_mode of the child, the way we attach the config will vary.
     for child in config_block.children:
+        if child.name is None:
+            raise PluginException("A child config block can not have a null name")
+
         if child.nesting_mode == "single":
             if child.name in d:
                 raise PluginException(
@@ -183,13 +258,9 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
             d[child.name] = child._config
 
-        elif child.nesting_mode == "set":
-            sets[child.name].append(child._config)
-
-        elif child.nesting_mode == "list":
-            if child.key is None:
-                raise PluginException("Nesting type dict requires the key to be set")
-
+        elif child.nesting_mode in ["set", "list"]:
+            # We will consider each set as a list, sorted with the generated key
+            # This allows us to generate the config consistently
             if child.key in lists[child.name]:
                 raise PluginException(
                     f"Can not set key-value pair {child.key}={child._config} as key is already "
@@ -211,12 +282,11 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
             dicts[child.name][child.key] = child._config
 
         else:
-            raise PluginException(f"Uknown nesting type: {child.nesting_mode}")
+            raise PluginException(f"Unknown nesting type: {child.nesting_mode}")
 
     # Check for all the dicts we will join that the keys sets don't intersect
     dict_sets: List[Tuple[str, dict]] = [
         ("single", d),
-        ("sets", sets),
         ("lists", lists),
         ("dicts", dicts),
     ]
@@ -235,10 +305,6 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
                     f"and {dict_set_name_b}={dict_set_b}"
                 )
 
-    # Add all the unordered lists (sets) to the config
-    for key, s in sets.items():
-        d[key] = s
-
     # Add all the ordered lists to the config
     for key, l in lists.items():
         sorted_l = sorted(((k, v) for k, v in l.items()), key=lambda x: x[0])
@@ -252,6 +318,142 @@ def serialize_config(config_block: "terraform::config::Block") -> "dict":  # typ
 
 
 @plugin
+def safe_resource_state(
+    context: Context,
+    resource: "terraform::Resource",  # type: ignore
+) -> "dict":
+    """
+    Get the state dict of a resource and check whether the current config of
+    the resource has changed since the state was published.  If this is the
+    case, raise an Unknown value, as the state is out of sync and is dangerous
+    to use.
+    """
+    try:
+        previous_state_wrapper = get_last_resource_state(context, resource)
+    except UnknownStateException as e:
+        return e.unknown
+
+    current_config_hash = utils.dict_hash(
+        resource.config, default_encoder=api_boundary_json_encoder
+    )
+    if (
+        generational_state_fact.AlbatrossGenerationStateFact.convert(
+            previous_state_wrapper
+        ).config_hash
+        != current_config_hash
+    ):
+        # The config and the state we have in cache are out of sync, it is
+        # unsafe to use, so we return an Unknown
+        LOGGER.debug(
+            f"Config hash for {inmanta.resources.to_id(resource)} (={current_config_hash}) doesn't match the current state"
+        )
+        return Unknown(source=resource)
+
+    # We can safely get the state
+    return previous_state_wrapper.get_state()
+
+
+@plugin
+def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "dict":  # type: ignore
+    """
+    Extract the state corresponding to the provided config block from the parent state.
+    This method should only be used with a state originating from the safe_resource_state
+    plugin.
+
+    :param state: The parent state dict, it should include our config at key config.name
+    :param config: The config block we want to find the matching config for.
+    """
+    if config.name is None:
+        raise PluginException("Can not extract the config for the root config block")
+
+    state_container = parent_state[config.name]
+
+    if config.nesting_mode == "single":
+        # Single embedded block, we can simply pick the the block in the state
+        return state_container
+
+    if config.nesting_mode == "dict":
+        # Block embedded in a dict, we need to take the block at key config.key
+        # in the dict
+        if not isinstance(state_container, DictProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
+
+        return state_container[config.key]
+
+    if config.nesting_mode == "list":
+        # Block embedded in a list, the list should be sorted using the key, and
+        # we should take the element in the state_container list at the same position
+        # as our config block in the global config
+        if not isinstance(state_container, SequenceProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
+
+        # This is the key of our config
+        config_key = config.key
+
+        parent_config = config.parent
+        sibling_configs = parent_config.children
+
+        # These are all the config keys, sorted (the state should be sorted the same way)
+        config_keys = sorted(c.key for c in sibling_configs if c.name == config.name)
+
+        # Sanity check, the state_container should have the same length as our configs
+        if not len(state_container) == len(config_keys):
+            raise PluginException(
+                "The length of the state list doesn't match the number of config blocks there is.  "
+                f"state={state_container}, config_keys={config_keys}"
+            )
+
+        config_position = config_keys.index(config_key)
+        return state_container[config_position]
+
+    if config.nesting_mode == "set":
+        # Block embedded in a set, the matching state might be anywhere.  To find it,
+        # we rely on the fact that the config dict is a subset of the state dict.  We
+        # check for each element in the list, which one wouldn't we changed it we
+        # updated it with our config, that one should be our state.
+        if not isinstance(state_container, SequenceProxy):
+            raise PluginException(
+                f"The state dict has an unexpected value at key {config.name}: "
+                f"{state_container} ({type(state_container)}).  State dict is "
+                f"{parent_state} ({type(parent_state)})"
+            )
+
+        # This is our attributes dict, minus all the default (null) values
+        # We don't consider values which are not attributes
+        clean_config = {k: v for k, v in config.attributes.items() if v is not None}
+
+        matching_states: list[DictProxy] = []
+        for candidate_state in state_container:
+            state = {k: v for k, v in candidate_state.items()}
+            for key, value in clean_config.items():
+                state[key] = value
+
+            if state == candidate_state:
+                matching_states.append(candidate_state)
+
+        if len(matching_states) != 1:
+            warnings.warn(
+                InmantaWarning(
+                    f"Failed to find a unique matching state in the list {state_container} for config "
+                    f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
+                )
+            )
+            return Unknown(object())
+
+        return matching_states[0]
+
+    raise PluginException(f"Unknown nesting mode: {config.nesting_mode}")
+
+
+@plugin
 def deprecated_config_block(config_block: "terraform::config::Block") -> None:  # type: ignore
     """
     Log a warning for the usage of a deprecated config block
@@ -259,7 +461,7 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
     config_path = []
     block = config_block
     while block is not None:
-        config_path.append(block.name)
+        config_path.append(block.name or "")
 
         try:
             block = block.parent
@@ -268,6 +470,18 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
 
     config_path_str = ".".join(reversed(config_path))
 
-    LOGGER.warning(
-        f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+    warnings.warn(
+        InmantaDeprecationWarning(
+            f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
+        )
     )
+
+
+@plugin
+def dict_hash(input: "dict") -> "string":  # type: ignore
+    return utils.dict_hash(input, api_boundary_json_encoder)
+
+
+@plugin
+def sorted_list(input_list: "list") -> "list":
+    return sorted(input_list)

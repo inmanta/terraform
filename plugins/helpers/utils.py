@@ -15,8 +15,10 @@
 
     Contact: code@inmanta.com
 """
+import hashlib
 import json
-from typing import Any, Dict
+import typing
+from typing import Any, Callable, Dict
 
 from inmanta.agent.handler import SkipResource
 from inmanta.protocol.endpoints import Client
@@ -26,6 +28,7 @@ from inmanta_plugins.terraform.helpers.const import (
     TERRAFORM_RESOURCE_STATE_PARAMETER,
 )
 from inmanta_plugins.terraform.helpers.param_client import RUN_SYNC, ParamClient
+from inmanta_plugins.terraform.states import generational_state_fact
 
 
 def parse_resource_state(current_state: dict, block: Any) -> dict:
@@ -186,6 +189,7 @@ def build_resource_state(
                 param_id=TERRAFORM_RESOURCE_STATE_PARAMETER,
                 resource_id=attribute_reference.resource_id,
             )
+
             foreign_state_raw = param_client.get()
             if foreign_state_raw is None:
                 raise SkipResource(
@@ -193,8 +197,10 @@ def build_resource_state(
                     f"State of {attribute_reference.resource_id} can not be found."
                 )
 
-            foreign_state = json.loads(foreign_state_raw)
-            return attribute_reference.extract_from_state(foreign_state)
+            state_fact = generational_state_fact.build_state_fact(
+                json.loads(foreign_state_raw)
+            )
+            return attribute_reference.extract_from_state(state_fact.get_state())
 
         return {
             key: build_resource_state(item, client, run_sync)
@@ -202,3 +208,14 @@ def build_resource_state(
         }
 
     return desired_state
+
+
+def dict_hash(
+    input: dict, default_encoder: typing.Optional[Callable[[object], object]] = None
+) -> str:
+    """
+    Take a dict as argument and compute a hash for that dict.
+    """
+    s = json.dumps(input, sort_keys=True, default=default_encoder)
+    hash_obj = hashlib.md5(s.encode("utf-8"))
+    return hash_obj.hexdigest()

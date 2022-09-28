@@ -74,7 +74,7 @@ class ParamClient:
             result = await self._client.set_param(
                 tid=self._environment,
                 id=self._param_id,
-                source=ParameterSource.plugin,
+                source=ParameterSource.fact,
                 value=value,
                 resource_id=self._resource_id,
                 recompile=True,
