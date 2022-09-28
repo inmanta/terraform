@@ -212,6 +212,22 @@ class AlbatrossGenerationStateFact(GenerationalStateFact):
         """
         The only source state fact we know how to recover from is the legacy one.  So we
         "convert" the input state fact to the legacy one and then upgrade it.
+
+        The config hash we set here is empty, this is because:
+        1. We can not derive the config hash from the state dict, it should be done by hashing
+            the desired config dict that was sent to the provider when we received this state 
+            dict back.  This comes from a previous model version so there is no way we can
+            get it now.
+        2. The config hash is a safety guarantee that tells whoever accesses the state, that if
+            the hash of their desired config matches this one, the state that comes along with
+            the hash can safely be used.  Without a hash we can not offer this guarantee, so the
+            hash we "fake" having is one that will never be valid.
+        
+        In pratice, this means that when a state that required conversion is accessed in the model
+        by through the terraform.safe_resource_state plugin, it will always be unknown, even if the
+        resource the state is originating from is already deployed.  The unknown will only be resolved
+        after the next deployment of the resource, once the handler code has been updated to use the
+        new state version.
         """
         legacy_state_fact = LegacyStateFact.convert(state)
         return AlbatrossGenerationStateFact(
