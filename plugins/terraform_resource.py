@@ -28,7 +28,7 @@ from inmanta.agent.agent import AgentInstance
 from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, provider
 from inmanta.agent.io.local import IOBase
 from inmanta.protocol.endpoints import Client
-from inmanta.resources import Id, PurgeableResource, resource, Resource
+from inmanta.resources import Id, PurgeableResource, Resource, resource
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (

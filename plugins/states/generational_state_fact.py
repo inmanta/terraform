@@ -87,7 +87,6 @@ import typing
 import pydantic
 import pydantic.typing
 
-
 STATE_DICT_GENERATION_MARKER = "__state_dict_generation"
 
 
@@ -167,7 +166,9 @@ class GenerationalStateFact(StateFact):
         Should be implemented by the subclass, and return the generation identifier
         """
 
-    def _iter(self, *args: typing.Any, **kwargs: typing.Any) -> "pydantic.typing.TupleGenerator":
+    def _iter(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> "pydantic.typing.TupleGenerator":
         """
         We overwrite the _iter method simply to add our generation marker to the
         generated dict or json payload.

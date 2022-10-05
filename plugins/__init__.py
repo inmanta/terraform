@@ -116,7 +116,9 @@ def get_last_resource_parameter(
     """
     resource_id = inmanta.resources.to_id(resource)
     if resource_id is None:
-        raise PluginException(f"Can not resolve the id for entity {resource}.  Is it a resource?")
+        raise PluginException(
+            f"Can not resolve the id for entity {resource}.  Is it a resource?"
+        )
 
     cached_parameter_dict = cache_dict.get(resource_id)
     if cached_parameter_dict is not None:
