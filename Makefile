@@ -35,6 +35,8 @@ mypy-tests:
 	@ echo -e "Running mypy on the module tests\n..."
 	@ $(RUN_MYPY_TESTS)
 
+ci-mypy: mypy-plugins
+
 .PHONY: mypy
 mypy: mypy-plugins mypy-tests
 
