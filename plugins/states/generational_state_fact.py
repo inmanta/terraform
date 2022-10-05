@@ -99,16 +99,16 @@ class StateFact(pydantic.BaseModel):
         terraform handler, it doesn't contain any additional information.
         """
 
-    @abc.abstractmethod
     @classmethod
+    @abc.abstractmethod
     def build_from_state(cls: typing.Type["SF"], state: dict) -> "SF":
         """
         This method should be implemented for each subclass and returns and
         instance of the subclass, constructed with the provided state dict.
         """
 
-    @abc.abstractmethod
     @classmethod
+    @abc.abstractmethod
     def _convert(cls: typing.Type["SF"], state: "StateFact") -> typing.Optional["SF"]:
         """
         Convert any input state received in argument to this class type of state.
