@@ -109,7 +109,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
 
         return self._state
 
-    @private.setter
+    @private.setter  # type: ignore
     def private(self, value: bytes) -> None:
         """
         Every time a new value for the private is set, we save it in the private file.  And update the cached value.
@@ -119,7 +119,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
 
         self._private = value
 
-    @state.setter
+    @state.setter  # type: ignore
     def state(self, value: dict) -> None:
         """
         Every time a new value for the state is set, we save it in the parameter corresponding to it. And update

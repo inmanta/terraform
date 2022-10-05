@@ -87,7 +87,7 @@ def resource_attribute_reference(
             f"The plugin path should be a list but type is {type(attribute_path)}"
         )
 
-    for attribute in attribute_path:
+    for attribute in attribute_path:  # type: ignore
         if isinstance(attribute, str):
             continue
 
@@ -101,7 +101,7 @@ def resource_attribute_reference(
     return AttributeReference(
         environment=environment,
         resource_id=resource_id,
-        attribute_path=list(attribute_path),
+        attribute_path=list(attribute_path),  # type: ignore
     )
 
 
@@ -115,6 +115,8 @@ def get_last_resource_parameter(
     :raises: UnknownStateException if the state dict is not found in parameters
     """
     resource_id = inmanta.resources.to_id(resource)
+    if resource_id is None:
+        raise PluginException(f"Can not resolve the id for entity {resource}.  Is it a resource?")
 
     cached_parameter_dict = cache_dict.get(resource_id)
     if cached_parameter_dict is not None:
@@ -331,7 +333,7 @@ def safe_resource_state(
     try:
         previous_state_wrapper = get_last_resource_state(context, resource)
     except UnknownStateException as e:
-        return e.unknown
+        return e.unknown  # type: ignore
 
     current_config_hash = utils.dict_hash(
         resource.config, default_encoder=api_boundary_json_encoder
@@ -347,7 +349,7 @@ def safe_resource_state(
         LOGGER.debug(
             f"Config hash for {inmanta.resources.to_id(resource)} (={current_config_hash}) doesn't match the current state"
         )
-        return Unknown(source=resource)
+        return Unknown(source=resource)  # type: ignore
 
     # We can safely get the state
     return previous_state_wrapper.get_state()
@@ -370,7 +372,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
 
     if config.nesting_mode == "single":
         # Single embedded block, we can simply pick the the block in the state
-        return state_container
+        return state_container  # type: ignore
 
     if config.nesting_mode == "dict":
         # Block embedded in a dict, we need to take the block at key config.key
@@ -382,7 +384,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
                 f"{parent_state} ({type(parent_state)})"
             )
 
-        return state_container[config.key]
+        return state_container[config.key]  # type: ignore
 
     if config.nesting_mode == "list":
         # Block embedded in a list, the list should be sorted using the key, and
@@ -412,7 +414,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
             )
 
         config_position = config_keys.index(config_key)
-        return state_container[config_position]
+        return state_container[config_position]  # type: ignore
 
     if config.nesting_mode == "set":
         # Block embedded in a set, the matching state might be anywhere.  To find it,
@@ -431,7 +433,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
         clean_config = {k: v for k, v in config.attributes.items() if v is not None}
 
         matching_states: list[DictProxy] = []
-        for candidate_state in state_container:
+        for candidate_state in state_container:  # type: ignore
             state = {k: v for k, v in candidate_state.items()}
             for key, value in clean_config.items():
                 state[key] = value
@@ -446,9 +448,9 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
                     f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
                 )
             )
-            return Unknown(object())
+            return Unknown(object())  # type: ignore
 
-        return matching_states[0]
+        return matching_states[0]  # type: ignore
 
     raise PluginException(f"Unknown nesting mode: {config.nesting_mode}")
 
