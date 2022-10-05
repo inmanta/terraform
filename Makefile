@@ -37,6 +37,8 @@ mypy-tests:
 
 ci-mypy: mypy-plugins
 
+ci-pep8: pep8
+
 .PHONY: mypy
 mypy: mypy-plugins mypy-tests
 
