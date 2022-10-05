@@ -7,3 +7,6 @@ mypy
 
 # For v1 module development
 inmanta_plugins/
+
+# Output of the inmanta module build command
+dist/
