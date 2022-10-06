@@ -85,9 +85,8 @@ import datetime
 import typing
 
 import pydantic
+import pydantic.typing
 
-SF = typing.TypeVar("SF", bound="StateFact")
-GSF = typing.TypeVar("GSF", bound="GenerationalStateFact")
 STATE_DICT_GENERATION_MARKER = "__state_dict_generation"
 
 
@@ -100,22 +99,24 @@ class StateFact(pydantic.BaseModel):
         terraform handler, it doesn't contain any additional information.
         """
 
-    @abc.abstractclassmethod
-    def build_from_state(cls: typing.Type[SF], state: dict) -> SF:
+    @classmethod
+    @abc.abstractmethod
+    def build_from_state(cls: typing.Type["SF"], state: dict) -> "SF":
         """
         This method should be implemented for each subclass and returns and
         instance of the subclass, constructed with the provided state dict.
         """
 
-    @abc.abstractclassmethod
-    def _convert(cls: typing.Type[SF], state: "StateFact") -> typing.Optional[SF]:
+    @classmethod
+    @abc.abstractmethod
+    def _convert(cls: typing.Type["SF"], state: "StateFact") -> typing.Optional["SF"]:
         """
         Convert any input state received in argument to this class type of state.
         If the conversion is not possible, it should return None or raise a ValueError.
         """
 
     @classmethod
-    def convert(cls: typing.Type[SF], state: "StateFact") -> SF:
+    def convert(cls: typing.Type["SF"], state: "StateFact") -> "SF":
         if isinstance(state, cls):
             # The current state fact is the targeted one, no need to dig further
             return state
@@ -128,6 +129,9 @@ class StateFact(pydantic.BaseModel):
 
         # The result is the object we wanted, we simply return it
         return result
+
+
+SF = typing.TypeVar("SF", bound=StateFact)
 
 
 class LegacyStateFact(StateFact):
@@ -143,11 +147,11 @@ class LegacyStateFact(StateFact):
         return self.state
 
     @classmethod
-    def build_from_state(cls, state: dict) -> "LegacyStateFact":
+    def build_from_state(cls: typing.Type["SF"], state: dict) -> "SF":
         return cls(state=state)
 
     @classmethod
-    def _convert(cls, state: StateFact) -> typing.Optional["LegacyStateFact"]:
+    def _convert(cls: typing.Type["SF"], state: "StateFact") -> typing.Optional["SF"]:
         """
         The legacy state fact should not be the desired type for any conversion
         """
@@ -162,18 +166,20 @@ class GenerationalStateFact(StateFact):
         Should be implemented by the subclass, and return the generation identifier
         """
 
-    def _iter(self, **kwargs) -> "pydantic.TupleGenerator":
+    def _iter(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> "pydantic.typing.TupleGenerator":
         """
         We overwrite the _iter method simply to add our generation marker to the
         generated dict or json payload.
         """
-        for x in super()._iter(**kwargs):
+        for x in super()._iter(*args, **kwargs):
             yield x
 
         yield STATE_DICT_GENERATION_MARKER, self.generation()
 
     @classmethod
-    def build_from_state(cls: typing.Type[GSF], state: dict) -> GSF:
+    def build_from_state(cls: typing.Type["GSF"], state: dict) -> "GSF":
         state_generation = state[STATE_DICT_GENERATION_MARKER]
         if not state_generation == cls.generation():
             # Actively check that the state dict is of the correct generation
@@ -182,6 +188,9 @@ class GenerationalStateFact(StateFact):
             )
 
         return cls(**state)
+
+
+GSF = typing.TypeVar("GSF", bound=GenerationalStateFact)
 
 
 class AlbatrossGenerationStateFact(GenerationalStateFact):

@@ -194,8 +194,8 @@ class TerraformResourceClient:
                 id,
             )
 
-        self.resource_state.state = new_state
-        self.resource_state.private = read_result.private
+        self.resource_state.state = new_state  # type: ignore
+        self.resource_state.private = read_result.private  # type: ignore
 
         return new_state
 
@@ -223,13 +223,13 @@ class TerraformResourceClient:
 
         raise_for_diagnostics(result.diagnostics, "Failed to read the resource")
 
-        self.resource_state.private = result.private
+        self.resource_state.private = result.private  # type: ignore
 
         # https://github.com/hashicorp/terraform/blob/126e49381811667c458915d4405c535ff139c398/internal/providers/provider.go#L189
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
         self.logger.info(f"Read resource with state: {json.dumps(new_state, indent=2)}")
         if new_state is not None:
-            self.resource_state.state = new_state
+            self.resource_state.state = new_state  # type: ignore
             return self.resource_state.state
 
         # We can actually receive a None state here, if the provider can not find the
@@ -281,7 +281,7 @@ class TerraformResourceClient:
 
         self.logger.debug(f"Create resource response: {str(result)}")
 
-        self.resource_state.private = result.private
+        self.resource_state.private = result.private  # type: ignore
 
         # Here we check if the new state is none as in the event of an error, the
         # returned state should be the most recent known state of the resource,
@@ -289,7 +289,7 @@ class TerraformResourceClient:
         # state might be none, we should then not store it in the resource state.
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
         if new_state is not None:
-            self.resource_state.state = new_state
+            self.resource_state.state = new_state  # type: ignore
         else:
             self.logger.warning("Null state received from provider")
 
@@ -364,7 +364,7 @@ class TerraformResourceClient:
 
         self.logger.debug(f"Update resource response: {str(result)}")
 
-        self.resource_state.private = result.private
+        self.resource_state.private = result.private  # type: ignore
 
         # Here we check if the new state is none as in the event of an error, the
         # returned state should be the most recent known state of the resource,
@@ -373,7 +373,7 @@ class TerraformResourceClient:
         # the diagnostics)
         new_state = parse_response(msgpack.unpackb(result.new_state.msgpack))
         if new_state is not None:
-            self.resource_state.state = new_state
+            self.resource_state.state = new_state  # type: ignore
 
         raise_for_diagnostics(result.diagnostics, "Failed to update the resource")
 

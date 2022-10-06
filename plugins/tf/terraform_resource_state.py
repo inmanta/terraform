@@ -48,11 +48,11 @@ class TerraformResourceState:
 
         self._private: Optional[bytes] = None
         if private is not None:
-            self.private = private
+            self.private = private  # type: ignore
 
         self._state: Optional[dict] = None
         if state is not None:
-            self.state = state
+            self.state = state  # type: ignore
 
     @property
     def type_name(self) -> str:
@@ -83,14 +83,14 @@ class TerraformResourceState:
         """
         return self._state
 
-    @private.setter
+    @private.setter  # type: ignore
     def private(self, value: bytes) -> None:
         """
         Set a new private value for the resource.
         """
         self._private = value
 
-    @state.setter
+    @state.setter  # type: ignore
     def state(self, value: dict) -> None:
         """
         Set a new state for the resource.

@@ -28,7 +28,7 @@ from inmanta.agent.agent import AgentInstance
 from inmanta.agent.handler import CRUDHandler, HandlerContext, ResourcePurged, provider
 from inmanta.agent.io.local import IOBase
 from inmanta.protocol.endpoints import Client
-from inmanta.resources import Id, PurgeableResource, resource
+from inmanta.resources import Id, PurgeableResource, Resource, resource
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
 from inmanta_plugins.terraform.helpers.param_client import ParamClient
 from inmanta_plugins.terraform.helpers.utils import (
@@ -53,7 +53,7 @@ from inmanta_plugins.terraform.tf.terraform_resource_client import (
     id_attribute="id",
 )
 class TerraformResource(PurgeableResource):
-    fields = (
+    fields = (  # type: ignore
         "agent_name",
         "provider_namespace",
         "provider_type",
@@ -123,13 +123,13 @@ class TerraformResourceHandler(CRUDHandler):
 
         return self._resource_client
 
-    def _agent_state_dir(self, resource: TerraformResource) -> str:
+    def _agent_state_dir(self, resource: Resource) -> str:
         # Files used by the handler should go in state_dir/cache/<module-name>/<agent-id>/
         base_dir = config.state_dir.get()
         agent_dir = os.path.join(
             base_dir,
             "cache/terraform",
-            resource.agent_name,
+            resource.agent_name,  # type: ignore
         )
         if Path(base_dir) not in Path(os.path.realpath(agent_dir)).parents:
             raise Exception(
@@ -138,16 +138,16 @@ class TerraformResourceHandler(CRUDHandler):
 
         return agent_dir
 
-    def _provider_state_dir(self, resource: TerraformResource) -> str:
+    def _provider_state_dir(self, resource: Resource) -> str:
         # In this module, using the above path as root folder, we use one dir by provider
         # with name <provider-namespace>/<provider-type>/<provider-version>, as we have an
         # index on those three values.
         base_dir = self._agent_state_dir(resource)
         provider_dir = os.path.join(
             base_dir,
-            resource.provider_namespace,
-            resource.provider_type,
-            resource.provider_version,
+            resource.provider_namespace,  # type: ignore
+            resource.provider_type,  # type: ignore
+            resource.provider_version,  # type: ignore
         )
         if Path(base_dir) not in Path(os.path.realpath(provider_dir)).parents:
             raise Exception(
@@ -156,14 +156,14 @@ class TerraformResourceHandler(CRUDHandler):
 
         return provider_dir
 
-    def _resource_state_dir(self, resource: TerraformResource) -> str:
+    def _resource_state_dir(self, resource: Resource) -> str:
         # In this module, using the above path as root folder, we use one dir by resource
         # with name <resource-type>/<resource-name>, as we have an index on those two values.
         base_dir = self._provider_state_dir(resource)
         resource_dir = os.path.join(
             base_dir,
-            resource.resource_type,
-            resource.resource_name,
+            resource.resource_type,  # type: ignore
+            resource.resource_name,  # type: ignore
         )
         if Path(base_dir) not in Path(os.path.realpath(resource_dir)).parents:
             raise Exception(
@@ -190,11 +190,11 @@ class TerraformResourceHandler(CRUDHandler):
           will however be solved once (if) we generate Inmanta modules automatically, setting those
           default values in the model directly.
         """
-        state: dict = copy.deepcopy(resource.resource_config)
+        state: dict = copy.deepcopy(resource.resource_config)  # type: ignore
         state.update({"id": id})
         return state
 
-    def pre(self, ctx: HandlerContext, resource: TerraformResource) -> None:
+    def pre(self, ctx: HandlerContext, resource: Resource) -> None:
         """
         During the pre phase, we have to:
          - Install the provider binary
@@ -202,15 +202,15 @@ class TerraformResourceHandler(CRUDHandler):
          - Start the provider process
         """
         provider_installer = ProviderInstaller(
-            namespace=resource.provider_namespace,
-            type=resource.provider_type,
+            namespace=resource.provider_namespace,  # type: ignore
+            type=resource.provider_type,  # type: ignore
             version=None
-            if resource.provider_version == "latest"
-            else resource.provider_version,
+            if resource.provider_version == "latest"  # type: ignore
+            else resource.provider_version,  # type: ignore
         )
         provider_installer.resolve()
 
-        resource.provider_version = provider_installer.version
+        resource.provider_version = provider_installer.version  # type: ignore
         # We specify the download path, so that the provider is not downloaded on every handler execution
         download_path = os.path.join(
             self._provider_state_dir(resource),
@@ -249,10 +249,10 @@ class TerraformResourceHandler(CRUDHandler):
         )
 
         terraform_resource_state = TerraformResourceStateInmanta(
-            type_name=resource.resource_type,
+            type_name=resource.resource_type,  # type: ignore
             private_file_path=private_file_path,
             param_client=param_client,
-            config_hash=dict_hash(resource.resource_config),
+            config_hash=dict_hash(resource.resource_config),  # type: ignore
         )
 
         self.provider = TerraformProvider(
@@ -263,7 +263,7 @@ class TerraformResourceHandler(CRUDHandler):
         self.provider.open()
 
         ctx.debug("Configuring provider")
-        self.provider.configure(resource.provider_config)
+        self.provider.configure(resource.provider_config)  # type: ignore
 
         self._resource_client = TerraformResourceClient(
             self.provider,
@@ -274,12 +274,12 @@ class TerraformResourceHandler(CRUDHandler):
         # The config can contain references to other resource attributes
         # We resolve any of those now and update the resource_config
         resource.resource_config = build_resource_state(
-            resource.resource_config,
+            resource.resource_config,  # type: ignore
             Client("agent"),
             lambda func: self.run_sync(func),
         )
 
-    def post(self, ctx: HandlerContext, resource: TerraformResource) -> None:
+    def post(self, ctx: HandlerContext, resource: Resource) -> None:
         """
         During the post phase we need to:
          - Stop the provider process
@@ -296,7 +296,7 @@ class TerraformResourceHandler(CRUDHandler):
 
         Path(self.log_file_path).unlink()
 
-    def read_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
+    def read_resource(self, ctx: HandlerContext, resource: PurgeableResource) -> None:
         """
         During the read phase, we need to:
          - Read the state, if there is none, we either:
@@ -308,10 +308,10 @@ class TerraformResourceHandler(CRUDHandler):
          - We save the current state
         """
         current_state = self.resource_client.read_resource()
-        if current_state is None and resource.terraform_id is not None:
+        if current_state is None and resource.terraform_id is not None:  # type: ignore
             try:
                 current_state = self.resource_client.import_resource(
-                    resource.terraform_id
+                    resource.terraform_id  # type: ignore
                 )
             except ResourceLookupException as e:
                 # We will get this exception if the resource can not be imported because it doesn't exist.
@@ -322,7 +322,7 @@ class TerraformResourceHandler(CRUDHandler):
         if not current_state:
             raise ResourcePurged()
 
-        desired_state = resource.resource_config
+        desired_state = resource.resource_config  # type: ignore
         current_state = parse_resource_state(
             current_state, self.resource_client.resource_schema.block
         )
@@ -332,23 +332,23 @@ class TerraformResourceHandler(CRUDHandler):
         # config recursively.  We don't do it as it would be really complicate to
         # get the diff in lists and sets correctly.
         # This might get solved by https://github.com/inmanta/terraform/issues/7
-        resource.resource_config = {
+        resource.resource_config = {  # type: ignore
             k: current_state.get(k) if v is not None else v
             for k, v in desired_state.items()
         }
 
         ctx.debug(
             "Resource read with config: %(config)s",
-            config=json.dumps(resource.resource_config),
+            config=json.dumps(resource.resource_config),  # type: ignore
         )
 
-    def create_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
+    def create_resource(self, ctx: HandlerContext, resource: PurgeableResource) -> None:
         """
         During the create phase, we need to:
          - Create the new resource with the provider process
          - Save the resource config in the state file
         """
-        current_state = self.resource_client.create_resource(resource.resource_config)
+        current_state = self.resource_client.create_resource(resource.resource_config)  # type: ignore
 
         if not current_state:
             raise RuntimeError(
@@ -369,7 +369,7 @@ class TerraformResourceHandler(CRUDHandler):
         ctx.set_created()
 
     def update_resource(
-        self, ctx: HandlerContext, changes: dict, resource: TerraformResource
+        self, ctx: HandlerContext, changes: dict, resource: PurgeableResource
     ) -> None:
         """
         During the update phase, we need to:
@@ -377,7 +377,7 @@ class TerraformResourceHandler(CRUDHandler):
          - Update the resource with the provider process
          - Save the new state to the state file
         """
-        current_state = self.resource_client.update_resource(resource.resource_config)
+        current_state = self.resource_client.update_resource(resource.resource_config)  # type: ignore
 
         if not current_state:
             raise RuntimeError(
@@ -396,7 +396,7 @@ class TerraformResourceHandler(CRUDHandler):
 
         ctx.set_updated()
 
-    def delete_resource(self, ctx: HandlerContext, resource: TerraformResource) -> None:
+    def delete_resource(self, ctx: HandlerContext, resource: PurgeableResource) -> None:
         """
         During the delete phase, we need to:
          - Read the current state
