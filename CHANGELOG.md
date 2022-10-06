@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.3.1 - ?
-- 
+## 1.3.2 - ?
+
+## 1.3.1 - 06/10/2022
+- Add py.typed file in module's plugins.
 
 ## 1.3.0 - 28/09/2022
 - Attach state to config blocks automatically.
