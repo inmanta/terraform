@@ -43,13 +43,6 @@ LOGGER = logging.getLogger(__name__)
 resource_states: dict[str, dict] = dict()
 
 
-class InmantaDeprecationWarning(DeprecationWarning):
-    """
-    This class can be used to warn about a deprecated part of the module.
-    It is both an inmanta warning and a deprecation warning.
-    """
-
-
 class UnknownStateException(RuntimeError):
     """
     This exception is raised whenever we try to get a state dict from the orchestrator
@@ -474,7 +467,7 @@ def deprecated_config_block(config_block: "terraform::config::Block") -> None:  
     config_path_str = ".".join(reversed(config_path))
 
     warnings.warn(
-        InmantaDeprecationWarning(
+        DeprecationWarning(
             f"The usage of config '{config_path_str}' at {config_block._get_instance().location} is deprecated"
         )
     )
