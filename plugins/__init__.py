@@ -29,7 +29,6 @@ from inmanta.execute.util import Unknown
 from inmanta.export import unknown_parameters
 from inmanta.plugins import Context, PluginException, plugin
 from inmanta.util import api_boundary_json_encoder
-from inmanta.warnings import InmantaWarning
 from inmanta_plugins.terraform.helpers import utils
 from inmanta_plugins.terraform.helpers.attribute_reference import AttributeReference
 from inmanta_plugins.terraform.helpers.const import TERRAFORM_RESOURCE_STATE_PARAMETER
@@ -44,7 +43,7 @@ LOGGER = logging.getLogger(__name__)
 resource_states: dict[str, dict] = dict()
 
 
-class InmantaDeprecationWarning(DeprecationWarning, InmantaWarning):
+class InmantaDeprecationWarning(DeprecationWarning):
     """
     This class can be used to warn about a deprecated part of the module.
     It is both an inmanta warning and a deprecation warning.
@@ -445,7 +444,7 @@ def extract_state(parent_state: "dict", config: "terraform::config::Block") -> "
 
         if len(matching_states) != 1:
             warnings.warn(
-                InmantaWarning(
+                Warning(
                     f"Failed to find a unique matching state in the list {state_container} for config "
                     f"{clean_config}.  Got a total of {len(matching_states)} in {matching_states}"
                 )
