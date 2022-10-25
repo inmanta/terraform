@@ -1,7 +1,8 @@
 # Changelog
 
 ## 1.3.2 - ?
-- Use native python warnings
+- Add timeouts on external http requests.
+- Use native python warnings.
 
 ## 1.3.1 - 06/10/2022
 - Add py.typed file in module's plugins.

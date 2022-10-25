@@ -289,12 +289,13 @@ class TerraformResourceHandler(CRUDHandler):
             ctx.debug("Stopping provider process")
             self.provider.close()
 
-        with open(self.log_file_path, "r") as f:
-            lines = f.readlines()
-            if lines:
-                ctx.debug("Provider logs", logs="".join(lines))
+        if self.log_file_path:
+            with open(self.log_file_path, "r") as f:
+                lines = f.readlines()
+                if lines:
+                    ctx.debug("Provider logs", logs="".join(lines))
 
-        Path(self.log_file_path).unlink()
+            Path(self.log_file_path).unlink()
 
     def read_resource(self, ctx: HandlerContext, resource: PurgeableResource) -> None:
         """
