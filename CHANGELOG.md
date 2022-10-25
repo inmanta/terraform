@@ -1,6 +1,9 @@
 # Changelog
 
-## 1.3.2 - ?
+## 1.3.1 - ?
+- 
+
+## 1.3.2 - 24/10/2022
 - Add timeouts on external http requests.
 - Use native python warnings.
 
