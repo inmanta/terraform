@@ -17,6 +17,7 @@
 """
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -139,22 +140,18 @@ def test_deprecated_config(project: Project) -> None:
     stdout, stderr = result.communicate()
     assert result.returncode == 0, stderr
 
-    desired_logs = {
-        (
-            f"py.warnings              WARNING {project._test_project_dir}/libs/terraform/plugins/__init__.py:469: "
-            f"DeprecationWarning: The usage of config '' at {project._test_project_dir}/main.cf:3 is deprecated"
-        ),
-        (
-            # prior to https://github.com/inmanta/inmanta-core/commit/64798acc8abcc3b7b31ab657f1d04e1974209d6f
-            f"py.warnings              WARNING {project._test_project_dir}/libs/terraform/plugins/__init__.py:469: "
-            "DeprecationWarning: The usage of config '' at ./main.cf:3 is deprecated"
-        ),
-    }
+    warning_regex = re.compile(
+        r"py.warnings              WARNING (.*)/terraform/plugins/__init__.py:(\d+): "
+        r"DeprecationWarning: The usage of config '' at (.*)/main.cf:3 is deprecated"
+    )
 
-    output_lines = set(stdout.split("\n"))
-    assert (
-        output_lines & desired_logs
-    ), f"Didn't find at least one of the expected logs in output: {desired_logs} & {output_lines} = {{}}"
+    for line in stdout.split("\n"):
+        if warning_regex.fullmatch(line):
+            break
+    else:
+        assert (
+            False
+        ), f"Didn't find any line matching {warning_regex.pattern} in compile logs:\n{stdout}"
 
 
 @pytest.mark.terraform_provider_local
