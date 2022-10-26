@@ -141,7 +141,7 @@ def test_deprecated_config(project: Project) -> None:
     assert result.returncode == 0, stderr
 
     warning_regex = re.compile(
-        r"py.warnings              WARNING (.*)/terraform/plugins/__init__.py:469: "
+        r"py.warnings              WARNING (.*)/terraform/plugins/__init__.py:(\d+): "
         r"DeprecationWarning: The usage of config '' at (.*)/main.cf:3 is deprecated"
     )
 
