@@ -1,7 +1,10 @@
 # Changelog
 
-## 1.3.1 - ?
+## 1.3.4 - ?
 - 
+
+## 1.3.3 - 26/10/2022
+- Minor test case improvement
 
 ## 1.3.2 - 24/10/2022
 - Add timeouts on external http requests.
