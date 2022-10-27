@@ -141,8 +141,8 @@ def test_deprecated_config(project: Project) -> None:
     assert result.returncode == 0, stderr
 
     warning_regex = re.compile(
-        r"py.warnings              WARNING (.*)/terraform/plugins/__init__.py:(\d+): "
-        r"DeprecationWarning: The usage of config '' at (.*)/main.cf:3 is deprecated"
+        r"py\.warnings\s+WARNING .*\/__init__\.py:\d+: DeprecationWarning: "
+        r"The usage of config '' at .*\/main\.cf:3 is deprecated"
     )
 
     for line in stdout.split("\n"):
@@ -151,7 +151,7 @@ def test_deprecated_config(project: Project) -> None:
     else:
         assert (
             False
-        ), f"Didn't find any line matching {warning_regex.pattern} in compile logs:\n{stdout}"
+        ), f"Didn't find any line matching {repr(warning_regex.pattern)} in compile logs:\n{stdout}"
 
 
 @pytest.mark.terraform_provider_local
