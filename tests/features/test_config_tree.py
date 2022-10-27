@@ -24,8 +24,10 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from uuid import UUID
 
+import pkg_resources
 import pytest
 from helpers.utils import deploy_model, get_param
+from packaging import version
 from pytest_inmanta.plugin import Project
 
 from inmanta.agent.agent import Agent
@@ -113,6 +115,19 @@ def test_config_serialization(project: Project):
 
 
 def test_deprecated_config(project: Project) -> None:
+    inmanta_core = pkg_resources.get_distribution("inmanta-core")
+    core_version = version.parse(inmanta_core.version)
+    minimal_version = version.parse("7.1.1.dev20221021125341")
+    if core_version < minimal_version:
+        # This commit has introduced a change in the way warnings should be raised from
+        # a model.  It removes the old behavior and adds a new one.  This module is compatible
+        # with the new one, and can be used with older versions, the warning will simply not be
+        # raised.
+        # https://github.com/inmanta/inmanta-core/commit/ceae06cf03b96aa6dbcac9a1c000818b06d3e086
+        pytest.skip(
+            f"Deprecation warning won't work with inmanta-core=={core_version} (< {minimal_version})"
+        )
+
     model = """
         import terraform::config
 
@@ -149,9 +164,11 @@ def test_deprecated_config(project: Project) -> None:
         if warning_regex.fullmatch(line):
             break
     else:
-        assert (
-            False
-        ), f"Didn't find any line matching {repr(warning_regex.pattern)} in compile logs:\n{stdout}"
+        assert False, (
+            f"Didn't find any line matching {repr(warning_regex.pattern)} in compile logs:\n"
+            f"STDOUT:\n{stdout}\n"
+            f"STDERR:\n{stderr}\n"
+        )
 
 
 @pytest.mark.terraform_provider_local
