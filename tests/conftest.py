@@ -141,16 +141,6 @@ def lab_config(lab_config_session: Dict[str, Any]) -> dict:
     return deepcopy(lab_config_session)
 
 
-@pytest.fixture(scope="session")
-def session_temp_dir(
-    tmpdir_factory: pytest.TempdirFactory,
-) -> typing.Generator[str, None, None]:
-    session_temp_dir = tmpdir_factory.mktemp("session")
-    LOGGER.info(f"Session temp dir is: {session_temp_dir}")
-    yield str(session_temp_dir)
-    session_temp_dir.remove(ignore_errors=False)
-
-
 @pytest.fixture(scope="function")
 def function_temp_dir(
     tmpdir_factory: pytest.TempdirFactory,
