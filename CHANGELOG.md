@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.10 - ?
+- Fix asyncio tests for python 3.6 (#549)
+
 ## 1.0.8 - 01/04/2022
 - Add pytest-asyncio mode to remove deprecation warnings.
 

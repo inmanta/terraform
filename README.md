@@ -9,7 +9,7 @@ Terraform has some features that do not translate directly to existing inmanta f
 > :heavy_check_mark: (*supported*)
 
 You can pick whatever version of any provider available in the terraform registry, you only need to provide three values:
- - `namespace`: a section in the terraform registry, in which the the provider is present.  More information [here](https://www.terraform.io/docs/internals/module-registry-protocol.html#namespace)
+ - `namespace`: a section in the terraform registry, in which the provider is present.  More information [here](https://www.terraform.io/docs/internals/module-registry-protocol.html#namespace)
  - `type`: the name of the provider, in the previously mentioned namespace.  :warning: This might be different from its display name.
  - `version` (optional, defaults to `"latest"`)  The version of the provider to use, if none is selected, the latest one is picked up.  We advise to pin the version, to avoid any surprise if a new version of the provider is released.
 
@@ -240,7 +240,7 @@ pytest tests --terraform-lab guillaume --terraform-cache-dir /tmp/your-cache-dir
 
 3. Test options
 
-The test are configurable through several means, one of them is pytest options.  You can use them to set the lab to use, a cache folder to use or to select which tests to run.  
+The test are configurable through several means, one of them is pytest options.  You can use them to set the lab to use, a cache folder to use or to select which tests to run.
 By default, all tests will run.  If you need/want to skip some, you have to unselect them, specifying the provider they are soliciting.  The options that can be used for this are the following:
 ```console
 $ pytest --help

@@ -58,6 +58,7 @@ async def get_param(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_store(
     project: Project,
     server: Server,
@@ -145,6 +146,7 @@ async def test_store(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_create_failed(
     project: Project,
     server: Server,
@@ -240,6 +242,7 @@ async def test_create_failed(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_update_failed(
     project: Project,
     server: Server,

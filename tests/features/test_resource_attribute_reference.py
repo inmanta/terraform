@@ -37,6 +37,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_plugin(
     project: Project,
     server: Server,
