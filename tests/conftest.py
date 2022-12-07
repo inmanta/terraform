@@ -17,9 +17,8 @@
 """
 import logging
 import os
-import shutil
+import typing
 from copy import deepcopy
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
@@ -65,6 +64,7 @@ provider_parameters = [
         "github",
         "gitlab",
         "local",
+        "docker",
     )
 ]
 
@@ -141,21 +141,14 @@ def lab_config(lab_config_session: Dict[str, Any]) -> dict:
     return deepcopy(lab_config_session)
 
 
-@pytest.fixture(scope="session")
-def session_temp_dir(tmpdir_factory: pytest.TempdirFactory) -> str:
-    session_temp_dir = tmpdir_factory.mktemp("session")
-    LOGGER.info(f"Session temp dir is: {str(session_temp_dir)}")
-    yield str(session_temp_dir)
-    session_temp_dir.remove(ignore_errors=True)
-
-
 @pytest.fixture(scope="function")
-def function_temp_dir(session_temp_dir: str) -> str:
-    function_temp_dir = Path(session_temp_dir) / Path("function")
-    function_temp_dir.mkdir(parents=True, exist_ok=False)
+def function_temp_dir(
+    tmpdir_factory: pytest.TempdirFactory,
+) -> typing.Generator[str, None, None]:
+    function_temp_dir = tmpdir_factory.mktemp("function")
     LOGGER.info(f"Function temp dir is: {function_temp_dir}")
     yield str(function_temp_dir)
-    shutil.rmtree(str(function_temp_dir), ignore_errors=True)
+    function_temp_dir.remove(ignore_errors=False)
 
 
 @pytest.fixture(scope="function")

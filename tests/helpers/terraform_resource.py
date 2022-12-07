@@ -25,9 +25,11 @@ from uuid import UUID
 
 from helpers.terraform_provider import TerraformProvider
 
+from inmanta.const import ParameterSource
 from inmanta.data import model
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import Client
+from inmanta.resources import Id
 
 QUERY_LIMIT = 25
 
@@ -74,6 +76,13 @@ class TerraformResource:
     def agent(self) -> str:
         return self.provider.agent
 
+    @property
+    def id(self) -> Id:
+        entity_id = (
+            f"{self.provider.agent}-{self.provider.alias}-{self.type}-{self.name}"
+        )
+        return Id.parse_id(f"terraform::Resource[{self.agent},id={entity_id}]")
+
     def model_instance(
         self,
         var_name: str,
@@ -108,7 +117,7 @@ class TerraformResource:
         client: Client,
         environment: UUID,
         oldest_first: bool = False,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Iterable[model.ResourceAction]:
@@ -207,7 +216,7 @@ class TerraformResource:
         self,
         client: Client,
         environment: UUID,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Optional[model.ResourceAction]:
@@ -227,7 +236,7 @@ class TerraformResource:
         self,
         client: Client,
         environment: UUID,
-        action_filter: Callable[[model.ResourceAction], bool] = None,
+        action_filter: Optional[Callable[[model.ResourceAction], bool]] = None,
         after: Optional[datetime.datetime] = None,
         before: Optional[datetime.datetime] = None,
     ) -> Optional[model.ResourceAction]:
@@ -242,3 +251,63 @@ class TerraformResource:
             return action
 
         return None
+
+    async def set_state(self, client: Client, environment: UUID, state: dict) -> None:
+        """
+        Manually set a new state for this resource in the parameters of the server.
+        """
+        result = await client.set_param(
+            tid=environment,
+            id="terraform-resource-state",
+            source=ParameterSource.user,
+            value=json.dumps(state),
+            resource_id=str(self.id),
+            recompile=True,
+        )
+        if result.code == 200:
+            return
+
+        assert (
+            False
+        ), f"Bad response while trying to set parameter: {result.code}, {result.message}"
+
+    async def get_state(self, client: Client, environment: UUID) -> Optional[dict]:
+        """
+        Get the state dict from the server, if it exists, None otherwise.
+        """
+        result = await client.get_param(
+            tid=environment,
+            id="terraform-resource-state",
+            resource_id=self.id,
+        )
+        if result.code == 200:
+            return json.loads(result.result["parameter"]["value"])
+
+        if result.code == 404:
+            return None
+
+        if result.code == 503:
+            # In our specific case, we might get a 503 if the parameter is not set yet
+            # https://github.com/inmanta/inmanta-core/blob/5bfe60683f7e21657794eaf222f43e4c53540bb5/src/inmanta/server/agentmanager.py#L799
+            return None
+
+        assert (
+            False
+        ), f"Unexpected response from server: {result.code}, {result.message}"
+
+    async def purge_state(self, client: Client, environment: UUID) -> None:
+        """
+        Purge the state dict of this resource from the server, if it exists.  This method
+        is idempotent.
+        """
+        result = await client.delete_param(
+            tid=environment,
+            id="terraform-resource-state",
+            resource_id=self.id,
+        )
+        if result.code == 200 or result.code == 404:
+            return
+
+        assert (
+            False
+        ), f"Unexpected response from server: {result.code}, {result.message}"

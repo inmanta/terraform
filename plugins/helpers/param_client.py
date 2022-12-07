@@ -15,13 +15,14 @@
 
     Contact: code@inmanta.com
 """
-from typing import Callable, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from inmanta.const import ParameterSource
 from inmanta.protocol import Client
 from inmanta.protocol.common import Result
 
 T = TypeVar("T")
+RUN_SYNC = Callable[[Callable[[], Coroutine[Any, Any, T]]], T]
 
 
 class ParamClientResultException(Exception):
@@ -38,7 +39,7 @@ class ParamClient:
         self,
         environment: str,
         client: Client,
-        run_sync: Callable[[Callable[[], T]], T],
+        run_sync: RUN_SYNC,
         param_id: str,
         resource_id: str,
     ) -> None:
@@ -73,7 +74,7 @@ class ParamClient:
             result = await self._client.set_param(
                 tid=self._environment,
                 id=self._param_id,
-                source=ParameterSource.plugin,
+                source=ParameterSource.fact,
                 value=value,
                 resource_id=self._resource_id,
                 recompile=True,
@@ -85,16 +86,17 @@ class ParamClient:
                 "Bad response while trying to set parameter", result
             )
 
-        return self._run_sync(set_param)
+        self._run_sync(set_param)
 
     def get(self) -> Optional[str]:
-        async def get_param() -> str:
+        async def get_param() -> Optional[str]:
             result = await self._client.get_param(
                 tid=self._environment,
                 id=self._param_id,
                 resource_id=self._resource_id,
             )
             if result.code == 200:
+                assert result.result is not None
                 return result.result["parameter"]["value"]
 
             if result.code == 404:
@@ -125,4 +127,4 @@ class ParamClient:
                 "Bad response while trying to delete parameter", result
             )
 
-        return self._run_sync(delete_param)
+        self._run_sync(delete_param)

@@ -1,6 +1,7 @@
 # terraform Module
 
-This modules is an interface between any terraform provider and inmanta.  It allows to quickly have a basic support of any technology that terraform supports in an inmanta model, managed by an inmanta orchestrator.
+This modules is an interface between any terraform provider and inmanta.  It allows to quickly have a basic support of any technology that terraform supports in an inmanta model, managed by an inmanta orchestrator.  
+All the logic packed into the module is also usable as a standalone terraform provider client sdk.  More information about this can be found in the examples.
 
 ## Terraform features
 Terraform has some features that do not translate directly to existing inmanta features (the opposite is true too).  For those, some workarounds needed to be found.  Here bellow are presented the main terraform features, and a short description of how we deal with those.
@@ -105,13 +106,14 @@ resource "fortios_system_interface" "my interface" {
 
 As in inmanta language, terraform allows to reference a resource attribute value, and assign it to another resource attribute for example.  What is interesting about it is that is works for generated attributes too.  (Generated attributes are attributes that you don't populate in your model but that will be filled by the provider.)
 Inmanta doesn't have this notion of generated attribute, so some workarounds had to be taken to support this.
-This feature is supported with two different implementations, which all have advantages and tradeoffs compare to the other.  It is up to you to decide which one should be use for your use case.  Both can be used in the same model without any interference issue.
+This feature is supported with three different implementations, which all have advantages and tradeoffs compare to the others.  It is up to you to decide which one should be use for your use case.  All can be used in the same model without any interference issue.
  1. `terraform::get_resource_attribute(resource, ["id"])`: returns the value directly, it can then be manipulated, formatted, etc.
     1. Advantages:
        1. The value can be manipulated.
        2. The value can be used anywhere in the model, not only for terraform resources configs.
     2. Disadvantages:
        1. As the value is resolved at compile time, the value we get always comes from the last deployment, not the one to come (obviously).
+       2. There is no safety mechanism to ensure that the value we received from state is still relevant (i.e. if we update the config of entity a, and use its previous state in the model, the state value might not be relevant anymore by the time we reach the deployment).
  2. `terraform::get_resource_attribute_ref(resource, ["id"])`: returns a reference to the value, it can not be manipulated, only assigned in another resource config dict.
     1. Advantages:
        1. It doesn't require multiple compile to resolve the value.
@@ -119,28 +121,41 @@ This feature is supported with two different implementations, which all have adv
     2. Disadvantages:
        1. The value can not be manipulated in the model.
        2. This can not be used for anything else than a resource config as the reference will only be understood by the terraform resource handler.
+ 3. `terraform::config::Block._state`: if you generate the config of the resource using the `terraform::config::Block` entity, on each config block entity, will be populated a `_state` attribute, holding the state of this resource for the part of the resource config three corresponding to the block entity.
+    1. Advantages:
+       1. You can actually access any part of the state dict, not only elements at the root of the config tree.
+       2. The access to the state elements is easy and safe, there is a safety mechanism that checks that this states corresponds to the version of the config currently in use in the model.
+    2. Disadvantages:
+       1. As the value is resolved at compile time, the value we get always comes from the last deployment, not the one to come (obviously).
+       2. Every time you update the config, there will always be a second compile with the updated state dict, even if you don't use it.
+       3. This makes the model much more complex for the compiler, it *might* not scale very well (untested).
 
 **Behavioral notes:**
-| Situation | First solution, direct access | Second solution, reference access |
-| --- | --- | --- |
-| The value is unknown at compile time. | If the value is unknown at compile time, the deployment will be skipped for the resource using it.  Once the value is known, a second compile is triggered and the resource will be deployed. | If the value is unknown at compile time, but can be resolved by the handler, the resource will be deployed. |
-| The value is unknown at deployment time. | Same as above. | The deployment will be skipped.  It will try again on every new deployment. |
+| Situation | First solution, direct access | Second solution, reference access | Third solution, direct access |
+| --- | --- | --- | --- |
+| The value is unknown at compile time. | If the value is unknown at compile time, the deployment will be skipped for the resource using it.  Once the value is known, a second compile is triggered and the resource will be deployed. | If the value is unknown at compile time, but can be resolved by the handler, the resource will be deployed. | Same as first solution |
+| The value is unknown at deployment time. | Same as above. | The deployment will be skipped.  It will try again on every new deployment. | Same as first solution |
 
 *Example:*
 ```
 file = terraform::Resource(
     type="local_file",
     name="my file",
-    config={
-        "filename": "/tmp/test-file.txt",
-        "content": "my original content",
-    },
+    manual_config=false,
     send_event=true,  # Without this, any update of the content wouldn't trigger an update for the reference mechanism
     purged=false,
     provider=provider,
+    root_config=terraform::config::Block(
+        name=null,
+        attributes={
+            "filename": "/tmp/test-file.txt",
+            "content": "my original content",
+        },
+    ),
 )
 
 # This entity will only be known after the first compile and deployed after the second
+# A change in the first file content won't trigger an update for this resource!
 file_id = terraform::get_resource_attribute(file, ["id"])
 terraform::Resource(
     type="local_file",
@@ -165,13 +180,27 @@ terraform::Resource(
     provider=provider,
     requires=file,  # This is important
 )
+
+# This entity will only be known after the first compile and deployed after the second
+# This example doesn't really show cases the real advantage of this approach, which becomes more clear when dealing with big config tree.
+file_id = file.root_config._state["id"]
+terraform::Resource(
+    type="local_file",
+    name="my id file 2",
+    config={
+        "filename": "/tmp/test-file-id.txt",
+        "content": "File id is: {{ file_id }}",
+    },
+    purged=false,
+    provider=provider,
+)
 ```
 
 ### Resource import
 > :heavy_check_mark: (*supported*)
 
 Terraform allows to import existing resources that are not currently managed into the model so that they become managed.  We can do this too by making use of the `terraform_id` attribute.
-When it is set, and if the resource doesn't have a state yet (isn't managed yet), we will first try to import it.  If the import fails, the resource deployment will fail too.
+When it is set, and if the resource doesn't have a state yet (isn't managed yet), we will first try to import it.  If the import fails because this is not supported for this resource type, the resource deployment will fail too.  If the import simply can't find the resource, we log a warning and go on with the deployment, a new resource will then be deployed.
 
 *Example:*
 ```

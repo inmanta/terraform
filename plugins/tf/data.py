@@ -69,7 +69,7 @@ class AttributePath:
         self.steps = steps
 
     def __str__(self) -> str:
-        return ".".join(self.steps)
+        return ".".join(str(step) for step in self.steps)
 
     def parse(raw_attribute_path: Any) -> "AttributePath":
         return AttributePath(

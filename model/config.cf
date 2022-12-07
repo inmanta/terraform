@@ -1,0 +1,188 @@
+"""
+    Copyright 2022 Inmanta
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Contact: code@inmanta.com
+"""
+
+typedef nesting_mode_t as string matching self in ["set", "list", "dict", "single"]
+"""
+    The nesting mode of a repeated config block.
+"""
+
+
+entity Block:
+    """
+    This entity represents a block of attributes in a terraform module.  It can be used
+    for anyone using the module to build a config.  It is being used by the generator
+    to generate the config of a resource or provider.
+
+    Source for the schema: 
+        https://github.com/inmanta/inmanta-tfplugin/blob/7269bc7d28d751b5dc110161dae29a6209c3fb63/docs/tf_grpc_plugin/proto/inmanta_tfplugin/tfplugin5.proto
+
+        tfplugin5.proto:
+        L81:    message Block {
+        L82:        int64 version = 1;
+        L83:        repeated Attribute attributes = 2;
+        L84:        repeated NestedBlock block_types = 3;
+        L85:        string description = 4;
+        L86:        StringKind description_kind = 5;
+        L87:        bool deprecated = 6;
+        L88:    }
+
+
+    :attr name: The name of this config section in the parent config block.
+        Should be left null for the root config block.
+    :attr attributes: A dictionary of attributes.  The key is the attribute name
+        as specified in the terraform provider schema.  The value is the value
+        assigned to this attribute in the corresponding inmanta entity.
+    :attr deprecated: If true, will raise a warning everytime the configuration
+        block is used.
+    :attr nesting_model: The nesting mode of this config into the parent one.
+        If it is a list, the key attribute should be set, and will be used to store
+        the different element of the list.  (Siblings of this element)
+        If it is a dict, the key attribute should be set, and will be used to place
+        the element in the dict named after the name of this block.
+    :attr key: The key, required for list and dict nesting mode, automatically set otherwise.
+    :attr _config: Generated, the serialized version of this config.
+    :attr _state: Generated, the current state for the resource attached to this config
+        block.  The state here matches the same element as this config block.
+        (The config should be a subset of the state if there is not change between last
+        compile config and current compile config, in which case the config will still
+        be unknown).
+
+    i.e. The following configuration structure can be constructed with entities.
+
+        .. code-block::
+
+            terraform::config::Block(
+                name=null,
+                attributes={"name": "Albert"},
+                children=[
+                    terraform::config::Block(
+                        name="children",
+                        attributes={"name": "Bob", "age": 12},
+                        nesting_mode="set",
+                    ),
+                    terraform::config::Block(
+                        name="children",
+                        attributes={"name": "Alice", "age": 14},
+                        nesting_mode="set",
+                    ),
+                    terraform::config::Block(
+                        name="pets",
+                        attributes={"type": "dog"},
+                        nesting_mode="dict",
+                        key="Brutus",
+                    ),
+                    terraform::config::Block(
+                        name="favorite_dishes",
+                        attributes={"name": "Pizza"},
+                        nesting_mode="list",
+                        key="1",
+                    ),
+                    terraform::config::Block(
+                        name="favorite_dishes",
+                        attributes={"name": "Pasta"},
+                        nesting_mode="list",
+                        key="2",
+                    )
+                ],
+                parent=null,
+                state=get_resource_attribute(terraform_resource, []),
+            )
+
+        It will be serialized as follows (the order of the children list might differ):
+
+        .. code-block::
+
+            {
+                "name": "Albert",
+                "children": [
+                    {
+                        "name": "Alice",
+                        "age": 14,
+                    },
+                    {
+                        "name": "Bob",
+                        "age": 12,
+                    },
+                ],
+                "pets": {
+                    "Brutus": {
+                        "type": "dog",
+                    },
+                },
+                "favorite_dishes": [
+                    {"name": "Pizza"},
+                    {"name": "Pasta"},
+                ],
+            }
+    """
+    string? name = null
+    dict attributes
+    bool deprecated = false
+
+    nesting_mode_t nesting_mode = "single"
+    string key
+
+    dict _config
+    dict _state
+end
+
+
+Block.parent [0:1] -- Block.children [0:]
+
+
+implementation generate_key for Block:
+    """
+    Automatically generate the key for blocks that don't require it
+    to be set.  This key will be a hash of the block's config and can
+    then be used to order the block and generate a consistent config
+    even with unordered sets of children blocks. (e.a. nesting_mode=set)
+    """
+    self.key = dict_hash(self._config)
+end
+
+
+implementation serialize for Block:
+    """
+    Serialize this block into a config dict.
+    """
+    self._config = serialize_config(self)
+end
+
+
+implementation build_state for Block:
+    """
+    Extract the state matching this block from the parent state.
+    This should only be called on non-root blocks.  The root block
+    should get the config from the resource parameter storing it.
+    """
+    self._state = extract_state(self.parent._state, self)
+end
+
+
+implementation deprecation_warning for Block:
+    """
+    Send a warning that the usage of this block is deprecated
+    """
+    deprecated_config_block(self)
+end
+
+
+implement Block using generate_key when not self.nesting_mode in ["list", "dict"]
+implement Block using serialize
+implement Block using build_state when self.name is defined
+implement Block using deprecation_warning when self.deprecated

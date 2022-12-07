@@ -20,7 +20,7 @@ import inspect
 import json
 import logging
 import time
-from typing import Callable, TypeVar
+from typing import Callable, Optional, TypeVar
 from uuid import UUID
 
 from pytest_inmanta.plugin import Project
@@ -67,15 +67,38 @@ async def retry_limited(fun, timeout, *args, **kwargs):
         raise TimeoutError("Bounded wait failed")
 
 
+async def get_param(
+    environment: str, client: Client, param_id: str, resource_id: str
+) -> Optional[str]:
+    result = await client.get_param(
+        tid=environment,
+        id=param_id,
+        resource_id=resource_id,
+    )
+    if result.code == 200:
+        return result.result["parameter"]["value"]
+
+    if result.code == 404:
+        return None
+
+    if result.code == 503:
+        # In our specific case, we might get a 503 if the parameter is not set yet
+        # https://github.com/inmanta/inmanta-core/blob/5bfe60683f7e21657794eaf222f43e4c53540bb5/src/inmanta/server/agentmanager.py#L799
+        return None
+
+    assert False, f"Unexpected response from server: {result.code}, {result.message}"
+
+
 async def deploy_model(
     project: Project,
     model: str,
     client: Client,
     environment: str,
     full_deploy: bool = False,
+    timeout: int = 15,
 ) -> VersionState:
     await compile_and_export(project, model)
-    deployment_result = await deploy(project, client, environment, full_deploy)
+    deployment_result = await deploy(project, client, environment, full_deploy, timeout)
     LOGGER.debug(json.dumps(deployment_result.result, indent=2))
     return deployment_result.result["model"]["result"]
 
@@ -111,7 +134,7 @@ async def deploy(
     client: Client,
     environment: UUID,
     full_deploy: bool = False,
-    timeout: int = 120,
+    timeout: int = 15,
 ) -> Result:
     """
     Asynchronously deploy model and wait for its deployment to complete
@@ -159,6 +182,12 @@ async def deploy(
             f"Timeout reached when waiting for resource to deploy: {json.dumps(result.result, indent=2)}"
         )
         raise e
+
+
+def is_failed_deployment(action: model.ResourceAction) -> bool:
+    return (
+        action.action == ResourceAction.deploy and action.status == ResourceState.failed
+    )
 
 
 def is_deployment(action: model.ResourceAction) -> bool:
