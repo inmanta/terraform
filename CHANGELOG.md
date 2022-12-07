@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.6 - 07/12/2022
+## 1.3.7 - 07/12/2022
 - Fix asyncio tests for python 3.6 (#549)
 
 ## 1.3.5 - 07/11/2022
@@ -43,7 +43,6 @@
 
 ## 1.0.10 - 07/06/2022
 - Remove double / from terraform registry URL
->>>>>>> master
 
 ## 1.0.8 - 01/04/2022
 - Add pytest-asyncio mode to remove deprecation warnings.
