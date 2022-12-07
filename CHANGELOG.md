@@ -1,4 +1,5 @@
 # Changelog
+
 ## 1.3.6 - 07/12/2022
 - Fix asyncio tests for python 3.6 (#549)
 
