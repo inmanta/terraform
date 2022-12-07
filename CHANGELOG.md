@@ -1,7 +1,7 @@
 # Changelog
 
-## 1.3.6 - ?
-- 
+## 1.3.7 - 07/12/2022
+- Fix asyncio tests for python 3.6 (#549)
 
 ## 1.3.5 - 07/11/2022
 - Minor test case improvement

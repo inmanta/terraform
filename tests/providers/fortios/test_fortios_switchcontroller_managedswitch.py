@@ -56,6 +56,7 @@ def assert_managed_switch_ports_configured(
 
 
 @pytest.mark.terraform_provider_fortios
+@pytest.mark.asyncio
 async def test_ports_update(
     project: Project,
     server: Server,

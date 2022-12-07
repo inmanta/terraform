@@ -51,6 +51,7 @@ def firewall_policy_is_deployed(
 
 
 @pytest.mark.terraform_provider_fortios
+@pytest.mark.asyncio
 async def test_crud(
     project: Project,
     server: Server,

@@ -40,6 +40,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 def test_standalone(
     project: Project,
     provider: LocalProvider,
@@ -117,6 +118,7 @@ def test_standalone(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_crud(
     project: Project,
     server: Server,

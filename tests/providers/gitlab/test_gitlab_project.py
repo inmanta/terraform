@@ -40,6 +40,7 @@ def project_is_deployed(path: str, client: GitlabClient) -> bool:
 
 
 @pytest.mark.terraform_provider_gitlab
+@pytest.mark.asyncio
 async def test_crud(
     project: Project,
     server: Server,

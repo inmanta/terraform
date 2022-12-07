@@ -39,6 +39,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_store(
     project: Project,
     server: Server,
@@ -119,6 +120,7 @@ async def test_store(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_create_failed(
     project: Project,
     server: Server,
@@ -199,6 +201,7 @@ async def test_create_failed(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_state_upgrade(
     project: Project,
     server: Server,
@@ -275,6 +278,7 @@ async def test_state_upgrade(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_state_extraction(
     project: Project,
     server: Server,
@@ -539,6 +543,7 @@ async def test_state_extraction(
 
 
 @pytest.mark.terraform_provider_local
+@pytest.mark.asyncio
 async def test_update_failed(
     project: Project,
     server: Server,
