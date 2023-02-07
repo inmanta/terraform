@@ -79,7 +79,6 @@ def global_client(
 
 @pytest.fixture(scope="function")
 def checkpoint_client(global_client: CheckpointClient) -> CheckpointClient:
-
     yield global_client
 
     try:

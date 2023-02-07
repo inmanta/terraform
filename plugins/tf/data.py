@@ -20,7 +20,6 @@ from typing import Any, List, Optional
 
 
 class DiagnosticSeverity(IntEnum):
-
     INVALID = 0
     ERROR = 1
     WARNING = 2
@@ -95,7 +94,6 @@ class Diagnostic:
         return f"{str(self.severity)}: {self.summary}{suffix}"
 
     def parse(raw_diagnostic: Any) -> "Diagnostic":
-
         attribute_path = (
             AttributePath.parse(raw_diagnostic.attribute_path)
             if hasattr(raw_diagnostic, "attribute_path")
