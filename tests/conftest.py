@@ -167,7 +167,7 @@ def cache_agent_dir(function_temp_dir: str, request: pytest.FixtureRequest) -> s
 
 
 @pytest.fixture
-def agent_factory(
+async def agent_factory(
     agent_factory: Callable[
         [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
     ],
@@ -176,11 +176,12 @@ def agent_factory(
 ) -> Callable[[UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent]:
     """
     Overwriting the existing agent_factory fixture.  This one does what the existing one does,
-    and also disable the agent backoff.  This should avoid any rate limiter issue poping in the tests.
+    and also disable the agent back off.  This should avoid any rate limiter issue popping in the tests.
 
-    We also make sure that the cache agent dir fixture is loaded.
+    We also make sure that the cache agent dir fixture is loaded, so that any agent process
+    being stopped still uses this cached dir.
 
     We overwrite this fixture because it is used in all our test needing agents, which might
-    potentially have backoff issues.
+    potentially have back off issues.
     """
     return agent_factory
