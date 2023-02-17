@@ -172,10 +172,13 @@ def agent_factory(
         [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
     ],
     no_agent_backoff: None,
+    cache_agent_dir: str,
 ) -> Callable[[UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent]:
     """
     Overwriting the existing agent_factory fixture.  This one does what the existing one does,
     and also disable the agent backoff.  This should avoid any rate limiter issue poping in the tests.
+
+    We also make sure that the cache agent dir fixture is loaded.
 
     We overwrite this fixture because it is used in all our test needing agents, which might
     potentially have backoff issues.
