@@ -159,9 +159,9 @@ def function_temp_dir(
             path.unlink()
             return
 
-        for path in path.glob("*"):
+        for inner_path in path.glob("*"):
             # Cleanup everything that is in the folder
-            cleanup(path)
+            cleanup(inner_path)
 
         # Cleanup the folder
         path.rmdir()
