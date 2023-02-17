@@ -17,6 +17,7 @@
 """
 import logging
 import os
+import pathlib
 import typing
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional
@@ -149,11 +150,24 @@ def function_temp_dir(
     LOGGER.info(f"Function temp dir is: {function_temp_dir}")
     yield str(function_temp_dir)
 
-    # Make sure we can modify all the files
-    function_temp_dir.chmod(0o777, rec=lambda _: True)
+    def cleanup(path: pathlib.Path) -> None:
+        # Make sure we can do everything we want on the file
+        path.chmod(0o777)
 
-    # Delete all the files
-    function_temp_dir.remove(ignore_errors=False)
+        if path.is_file():
+            # Delete the file
+            path.unlink()
+            return
+
+        for path in path.glob("*"):
+            # Cleanup everything that is in the folder
+            cleanup(path)
+
+        # Cleanup the folder
+        path.rmdir()
+
+    # Cleanup our dir
+    cleanup(pathlib.Path(str(function_temp_dir)))
 
 
 @pytest.fixture(scope="function")
