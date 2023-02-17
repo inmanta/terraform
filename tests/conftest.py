@@ -15,14 +15,18 @@
 
     Contact: code@inmanta.com
 """
+import asyncio
+import json
 import logging
 import os
 import pathlib
 import typing
+import uuid
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
+import helpers.utils
 import pytest
 import yaml
 from _pytest.config import Config
@@ -35,6 +39,9 @@ from helpers.parameter import (
     TestParameter,
 )
 
+import inmanta.server
+import inmanta.server.protocol
+from inmanta import config, protocol
 from inmanta.agent import config as inmanta_config
 from inmanta.agent.agent import Agent
 
@@ -187,12 +194,14 @@ def cache_agent_dir(function_temp_dir: str, request: pytest.FixtureRequest) -> s
 
 @pytest.fixture
 async def agent_factory(
-    agent_factory: Callable[
-        [UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent
-    ],
     no_agent_backoff: None,
     cache_agent_dir: str,
-) -> Callable[[UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent]:
+    client: protocol.Client,
+    server: inmanta.server.protocol.Server,
+    environment: str,
+) -> typing.Iterator[
+    Callable[[UUID, Optional[str], Optional[Dict[str, str]], bool, List[str]], Agent]
+]:
     """
     Overwriting the existing agent_factory fixture.  This one does what the existing one does,
     and also disable the agent back off.  This should avoid any rate limiter issue popping in the tests.
@@ -203,4 +212,75 @@ async def agent_factory(
     We overwrite this fixture because it is used in all our test needing agents, which might
     potentially have back off issues.
     """
-    return agent_factory
+    agentmanager = server.get_slice(inmanta.server.SLICE_AGENT_MANAGER)
+
+    config.Config.set("config", "agent-deploy-interval", "0")
+    config.Config.set("config", "agent-repair-interval", "0")
+
+    started_agents: typing.List[Agent] = []
+
+    async def create_agent(
+        environment: uuid.UUID,
+        hostname: Optional[str] = None,
+        agent_map: Optional[Dict[str, str]] = None,
+        code_loader: bool = False,
+        agent_names: List[str] = [],
+    ) -> Agent:
+        a = Agent(
+            hostname=hostname,
+            environment=environment,
+            agent_map=agent_map,
+            code_loader=code_loader,
+        )
+        for agent_name in agent_names:
+            await a.add_end_point_name(agent_name)
+        await a.start()
+        started_agents.append(a)
+        await helpers.utils.retry_limited(
+            lambda: a.sessionid in agentmanager.sessions, 10
+        )
+        return a
+
+    yield create_agent
+
+    async def list_agents() -> typing.List[dict]:
+        result = await client.list_agents(tid=environment)
+        all_agents = result.result["agents"]
+        LOGGER.debug("All agents: %s", json.dumps(all_agents, indent=2))
+        return all_agents
+
+    # Get the names of all the manually started agents
+    manually_started_agents = {
+        val for agent in started_agents for val in agent.agent_map.keys()
+    }
+
+    all_agents = await list_agents()
+    LOGGER.debug(
+        "Stopping %d out of %d agents because they were started manually",
+        len(manually_started_agents),
+        len(all_agents),
+    )
+    await asyncio.gather(*[agent.stop() for agent in started_agents])
+
+    async def agents_are_down() -> bool:
+        all_agents = await list_agents()
+        live_agents = [a for a in all_agents if a["state"] != "down"]
+        my_agents = [a for a in live_agents if a["name"] in manually_started_agents]
+        if len(my_agents) > 0:
+            LOGGER.info(
+                "Some of the manually started agent didn't stop yet: %s",
+                str([a["name"] for a in my_agents]),
+            )
+            return False
+
+        LOGGER.info(
+            "Done waiting for all agents to start.  Remaining live agents: %s",
+            str([a["name"] for a in live_agents]),
+        )
+        return True
+
+    LOGGER.debug(
+        "Waiting for manually started agents to terminate: %s",
+        str(manually_started_agents),
+    )
+    await helpers.utils.retry_limited(agents_are_down, 10)

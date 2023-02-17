@@ -61,10 +61,11 @@ async def retry_limited(fun, timeout, *args, **kwargs):
             return fun(*args, **kwargs)
 
     start = time.time()
-    while time.time() - start < timeout and not (await fun_wrapper()):
+    while time.time() - start < timeout:
+        if await fun_wrapper():
+            return
         await asyncio.sleep(1)
-    if not (await fun_wrapper()):
-        raise TimeoutError("Bounded wait failed")
+    raise TimeoutError("Bounded wait failed")
 
 
 async def get_param(
