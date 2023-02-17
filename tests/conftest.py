@@ -148,6 +148,14 @@ def function_temp_dir(
     function_temp_dir = tmpdir_factory.mktemp("function")
     LOGGER.info(f"Function temp dir is: {function_temp_dir}")
     yield str(function_temp_dir)
+
+    # Make sure we own all the files
+    function_temp_dir.chown(user=os.getuid(), group=os.getgid(), rec=20)
+
+    # Make sure we can modify all the files
+    function_temp_dir.chmod(0o777, rec=lambda _: True)
+
+    # Delete all the files
     function_temp_dir.remove(ignore_errors=False)
 
 
