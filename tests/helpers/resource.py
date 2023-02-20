@@ -96,8 +96,6 @@ class Resource:
                 limit=QUERY_LIMIT,
                 resource_type=self.resource_type,
                 agent=self.agent,
-                attribute=self.attribute,
-                attribute_value=self.attribute_value,
             )
 
             # Filtering None values from dict
@@ -151,6 +149,11 @@ class Resource:
                     # We need to check this here as well or me might accept an action that
                     # is out of the bounds
                     return
+
+                if Id.parse_id(action.resource_version_ids[0]).resource_str() != self.id.resource_str():
+                    # This resource action doesn't belong to our resource, so we continue
+                    LOGGER.debug("Skipping action because it doesn't come from our resource: %s", action.resource_version_ids[0])
+                    continue
 
                 if action_filter is None or action_filter(action):
                     yield action

@@ -29,8 +29,6 @@ from inmanta.const import ParameterSource
 from inmanta.protocol.endpoints import Client
 from inmanta.resources import Id
 
-QUERY_LIMIT = 25
-
 LOGGER = logging.getLogger(__name__)
 
 

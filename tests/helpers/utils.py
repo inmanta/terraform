@@ -30,7 +30,8 @@ from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 
 from inmanta.agent.handler import HandlerContext
 from inmanta.const import (
-    TIME_ISOFMT,
+    DONE_STATES,
+    UNDEPLOYABLE_STATES,
     Change,
     ResourceAction,
     ResourceState,
@@ -157,15 +158,8 @@ async def deploy(
         return
 
     # Checking when did the last deployment finish
-    last_deployment_date = sorted(
-        [res["last_deploy"] or "" for res in result.result["resources"]]
-    )[-1]
-    last_deployment_datetime = (
-        datetime.datetime.strptime(last_deployment_date, TIME_ISOFMT)
-        if last_deployment_date
-        else datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
-    )
-    LOGGER.info(f"Last deployment date: {last_deployment_datetime}")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    LOGGER.info("Will start a new deployment now: %s", str(now))
 
     def deploy():
         project.deploy_latest_version(full_deploy=full_deploy)
@@ -178,20 +172,23 @@ async def deploy(
         # Finished if all resources last deploy is after the last deployment registered
         # and no resource is in deploying state
         for res in result.result["resources"]:
-            if res["status"] == ResourceState.deploying:
+            if res["status"] not in DONE_STATES:
                 # Something is still going on
                 return False
 
-            # If we had a deployment, we still need to make sure that it is not a
-            # simple "Setting deployed due to known good status"
+            if res["status"] in UNDEPLOYABLE_STATES:
+                # This resource will not get deployed
+                continue
+
+            # Get all the deployments done after the new deploy was made
             resource = Resource(id=Id.parse_id(res["resource_id"]))
             last_deploy = await resource.get_last_action(
                 client=client,
                 environment=environment,
                 action_filter=(
-                    is_deployment if not full_deploy else is_deployment_with_change
+                    is_repair_deployment if full_deploy else is_deployment
                 ),
-                after=last_deployment_datetime,
+                after=now,
             )
             if last_deploy is None:
                 # We don't have a deploy matching the filter
