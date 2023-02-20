@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import asyncio
+import datetime
 import inspect
 import json
 import logging
@@ -23,14 +24,22 @@ import time
 from typing import Callable, Optional, TypeVar
 from uuid import UUID
 
+from helpers.resource import Resource
 from pytest_inmanta.plugin import Project
 from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 
 from inmanta.agent.handler import HandlerContext
-from inmanta.const import Change, ResourceAction, ResourceState, VersionState
+from inmanta.const import (
+    TIME_ISOFMT,
+    Change,
+    ResourceAction,
+    ResourceState,
+    VersionState,
+)
 from inmanta.data import model
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import Client
+from inmanta.resources import Id
 
 LOGGER = logging.getLogger(__name__)
 
@@ -151,7 +160,12 @@ async def deploy(
     last_deployment_date = sorted(
         [res["last_deploy"] or "" for res in result.result["resources"]]
     )[-1]
-    LOGGER.info(f"Last deployment date: {last_deployment_date}")
+    last_deployment_datetime = (
+        datetime.datetime.strptime(last_deployment_date, TIME_ISOFMT)
+        if last_deployment_date
+        else datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
+    )
+    LOGGER.info(f"Last deployment date: {last_deployment_datetime}")
 
     def deploy():
         project.deploy_latest_version(full_deploy=full_deploy)
@@ -164,9 +178,23 @@ async def deploy(
         # Finished if all resources last deploy is after the last deployment registered
         # and no resource is in deploying state
         for res in result.result["resources"]:
-            if (res["last_deploy"] or "") <= last_deployment_date or res[
-                "status"
-            ] == ResourceState.deploying:
+            if res["status"] == ResourceState.deploying:
+                # Something is still going on
+                return False
+
+            # If we had a deployment, we still need to make sure that it is not a
+            # simple "Setting deployed due to known good status"
+            resource = Resource(id=Id.parse_id(res["resource_id"]))
+            last_deploy = await resource.get_last_action(
+                client=client,
+                environment=environment,
+                action_filter=(
+                    is_deployment if not full_deploy else is_deployment_with_change
+                ),
+                after=last_deployment_datetime,
+            )
+            if last_deploy is None:
+                # We don't have a deploy matching the filter
                 return False
 
         return True
@@ -189,6 +217,18 @@ def is_failed_deployment(action: model.ResourceAction) -> bool:
     return (
         action.action == ResourceAction.deploy and action.status == ResourceState.failed
     )
+
+
+def is_repair_deployment(action: model.ResourceAction) -> bool:
+    if not is_deployment(action):
+        return False
+
+    for message in action.messages:
+        # The action is not a repair
+        if message["msg"] == "Setting deployed due to known good status":
+            return False
+
+    return True
 
 
 def is_deployment(action: model.ResourceAction) -> bool:
