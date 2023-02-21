@@ -185,9 +185,7 @@ async def deploy(
             last_deploy = await resource.get_last_action(
                 client=client,
                 environment=environment,
-                action_filter=(
-                    is_repair_deployment if full_deploy else is_deployment
-                ),
+                action_filter=is_repair_deployment if full_deploy else is_deployment,
                 after=now,
             )
             if last_deploy is None:

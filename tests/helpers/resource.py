@@ -150,9 +150,16 @@ class Resource:
                     # is out of the bounds
                     return
 
-                if Id.parse_id(action.resource_version_ids[0]).resource_str() != self.id.resource_str():
+                if (
+                    Id.parse_id(action.resource_version_ids[0]).resource_str()
+                    != self.id.resource_str()
+                ):
                     # This resource action doesn't belong to our resource, so we continue
-                    LOGGER.debug("Skipping action because it doesn't come from our resource: %s", action.resource_version_ids[0])
+                    LOGGER.debug(
+                        "Skipping action because it doesn't come from our resource: %s != %sv*",
+                        action.resource_version_ids[0],
+                        self.id.resource_str(),
+                    )
                     continue
 
                 if action_filter is None or action_filter(action):
