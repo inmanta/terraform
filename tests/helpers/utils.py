@@ -95,7 +95,7 @@ async def deploy_model(
     client: Client,
     environment: str,
     full_deploy: bool = False,
-    timeout: int = 15,
+    timeout: int = 30,
 ) -> VersionState:
     await compile_and_export(project, model)
     deployment_result = await deploy(project, client, environment, full_deploy, timeout)
