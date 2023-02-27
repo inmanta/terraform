@@ -137,7 +137,7 @@ async def deploy(
     client: Client,
     environment: UUID,
     full_deploy: bool = False,
-    timeout: int = 15,
+    timeout: int = 30,
 ) -> Result:
     """
     Asynchronously deploy model and wait for its deployment to complete
