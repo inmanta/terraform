@@ -54,8 +54,8 @@ async def off_main_thread(func: Callable[[], T]) -> T:
 
 
 async def retry_limited(fun, timeout, *args, **kwargs):
-    LOGGER.debug("=============timeout=============", indent=2)
-    LOGGER.debug(str(timeout), indent=2)
+    LOGGER.debug("=============timeout=============")
+    LOGGER.debug(str(timeout))
 
     async def fun_wrapper():
         if inspect.iscoroutinefunction(fun):
