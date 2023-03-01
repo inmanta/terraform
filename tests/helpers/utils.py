@@ -30,7 +30,7 @@ from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 
 from inmanta.agent.handler import HandlerContext
 from inmanta.const import (
-    DONE_STATES,
+    TRANSIENT_STATES,
     UNDEPLOYABLE_STATES,
     Change,
     ResourceAction,
@@ -155,7 +155,7 @@ async def deploy(
     if result.result["model"]["total"] == 0:
         # Nothing to deploy
         LOGGER.warning(f"Nothing to deploy: {json.dumps(result.result, indent=2)}")
-        return
+        return result
 
     # Checking when did the last deployment finish
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -167,32 +167,52 @@ async def deploy(
     # Triggering deploy
     await off_main_thread(deploy)
 
+    # Get all the resources that should be deployed and build a set containing
+    # all the resources we should be waiting for
+    result = await get_version_or_fail(project, client, environment)
+    resources = {
+        res["resource_id"]: Resource(id=Id.parse_id(res["resource_id"]))
+        for res in result.result["resources"]
+    }
+
     async def is_deployment_finished():
         result = await get_version_or_fail(project, client, environment)
         # Finished if all resources last deploy is after the last deployment registered
         # and no resource is in deploying state
         for res in result.result["resources"]:
-            if res["status"] not in DONE_STATES:
+            resource_id: str = res["resource_id"]
+
+            if resource_id not in resources:
+                # We don't care about this resource
+                continue
+
+            if res["status"] in TRANSIENT_STATES:
                 # Something is still going on
-                return False
+                continue
 
             if res["status"] in UNDEPLOYABLE_STATES:
                 # This resource will not get deployed
+                # We can remove it from the watching set
+                resources.pop(resource_id)
                 continue
 
             # Get all the deployments done after the new deploy was made
-            resource = Resource(id=Id.parse_id(res["resource_id"]))
+            resource = resources[resource_id]
             last_deploy = await resource.get_last_action(
                 client=client,
                 environment=environment,
-                action_filter=is_repair_deployment if full_deploy else is_deployment,
+                action_filter=is_repair if full_deploy else is_deployment,
                 after=now,
             )
             if last_deploy is None:
                 # We don't have a deploy matching the filter
-                return False
+                continue
 
-        return True
+            # If we reach this state, the resource reached the state we care about
+            # We can remove it from the watching set
+            resources.pop(resource_id)
+
+        return not resources
 
     try:
         # Waiting for deployment to finish
@@ -203,7 +223,8 @@ async def deploy(
         result = await get_version_or_fail(project, client, environment)
 
         LOGGER.warning(
-            f"Timeout reached when waiting for resource to deploy: {json.dumps(result.result, indent=2)}"
+            "Timeout reached when waiting for resources to deploy: %s",
+            json.dumps(result.result, indent=2),
         )
         raise e
 
@@ -214,7 +235,7 @@ def is_failed_deployment(action: model.ResourceAction) -> bool:
     )
 
 
-def is_repair_deployment(action: model.ResourceAction) -> bool:
+def is_repair(action: model.ResourceAction) -> bool:
     if not is_deployment(action):
         return False
 

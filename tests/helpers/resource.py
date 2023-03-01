@@ -128,7 +128,7 @@ class Resource:
 
             if not actions:
                 # We reached the end, the server doesn't have any more action to give us
-                return
+                break
 
             for action in sorted(
                 actions, key=lambda action: action.started, reverse=not oldest_first
@@ -148,18 +148,15 @@ class Resource:
                 if before <= after:
                     # We need to check this here as well or me might accept an action that
                     # is out of the bounds
-                    return
+                    break
 
+                # Build the id with version of this resource
+                versioned_id = self.id.copy(version=action.version)
                 if (
-                    Id.parse_id(action.resource_version_ids[0]).resource_str()
-                    != self.id.resource_str()
+                    versioned_id.resource_version_str()
+                    not in action.resource_version_ids
                 ):
-                    # This resource action doesn't belong to our resource, so we continue
-                    LOGGER.debug(
-                        "Skipping action because it doesn't come from our resource: %s != %sv*",
-                        action.resource_version_ids[0],
-                        self.id.resource_str(),
-                    )
+                    # Our resource is not part of this action
                     continue
 
                 if action_filter is None or action_filter(action):
