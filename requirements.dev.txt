@@ -9,6 +9,7 @@ types-requests
 docker
 
 # This pre-release is broken as reported here: https://github.com/grpc/grpc/issues/30640
+# Also broken here: https://github.com/grpc/grpc/issues/31885
 # The version constraint can be removed once a newer pre-release is published.
 # Also update requirements.txt
-grpcio-tools!=1.49.0rc1
+grpcio-tools!=1.49.0rc1,!=1.52.0rc1
