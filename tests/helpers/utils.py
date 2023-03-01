@@ -201,7 +201,7 @@ async def deploy(
             last_deploy = await resource.get_last_action(
                 client=client,
                 environment=environment,
-                action_filter=is_repair if full_deploy else is_deployment,
+                action_filter=is_repair if full_deploy else is_deploy,
                 after=now,
             )
             if last_deploy is None:
@@ -229,14 +229,12 @@ async def deploy(
         raise e
 
 
-def is_failed_deployment(action: model.ResourceAction) -> bool:
-    return (
-        action.action == ResourceAction.deploy and action.status == ResourceState.failed
-    )
+def is_deploy(action: model.ResourceAction) -> bool:
+    return action.action == ResourceAction.deploy
 
 
 def is_repair(action: model.ResourceAction) -> bool:
-    if not is_deployment(action):
+    if not is_deploy(action):
         return False
 
     for message in action.messages:
@@ -245,6 +243,12 @@ def is_repair(action: model.ResourceAction) -> bool:
             return False
 
     return True
+
+
+def is_failed_deployment(action: model.ResourceAction) -> bool:
+    return (
+        action.action == ResourceAction.deploy and action.status == ResourceState.failed
+    )
 
 
 def is_deployment(action: model.ResourceAction) -> bool:
