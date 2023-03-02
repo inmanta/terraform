@@ -230,7 +230,7 @@ async def deploy(
 
 
 def is_deploy(action: model.ResourceAction) -> bool:
-    return action.action == ResourceAction.deploy
+    return action.action == ResourceAction.deploy and action.status not in TRANSIENT_STATES
 
 
 def is_repair(action: model.ResourceAction) -> bool:
