@@ -161,7 +161,7 @@ def function_temp_dir(
         # Make sure we can do everything we want on the file
         path.chmod(0o777)
 
-        if path.is_file():
+        if not path.is_dir():
             # Delete the file
             path.unlink()
             return
