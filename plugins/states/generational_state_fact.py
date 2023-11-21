@@ -76,7 +76,7 @@
 
             state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
                 ...,
-                BuboGenerationStateFact.generation(): BuboGenerationStateFact,
+                BuboGenerationStateFact.generation: BuboGenerationStateFact,
             }
 
 """
@@ -160,31 +160,21 @@ class LegacyStateFact(StateFact):
 
 class GenerationalStateFact(StateFact):
     @classmethod
+    @pydantic.computed_field(alias=STATE_DICT_GENERATION_MARKER)
+    @property
     @abc.abstractmethod
     def generation(cls) -> str:
         """
         Should be implemented by the subclass, and return the generation identifier
         """
 
-    def _iter(
-        self, *args: typing.Any, **kwargs: typing.Any
-    ) -> "pydantic.typing.TupleGenerator":
-        """
-        We overwrite the _iter method simply to add our generation marker to the
-        generated dict or json payload.
-        """
-        for x in super()._iter(*args, **kwargs):
-            yield x
-
-        yield STATE_DICT_GENERATION_MARKER, self.generation()
-
     @classmethod
     def build_from_state(cls: typing.Type["GSF"], state: dict) -> "GSF":
         state_generation = state[STATE_DICT_GENERATION_MARKER]
-        if not state_generation == cls.generation():
+        if not state_generation == cls.generation:
             # Actively check that the state dict is of the correct generation
             raise ValueError(
-                f"Unexpected generation value: {state_generation} != {cls.generation()}"
+                f"Unexpected generation value: {state_generation} != {cls.generation}"
             )
 
         return cls(**state)
@@ -211,6 +201,8 @@ class AlbatrossGenerationStateFact(GenerationalStateFact):
         return self.state
 
     @classmethod
+    @pydantic.computed_field(alias=STATE_DICT_GENERATION_MARKER)
+    @property
     def generation(cls) -> str:
         return "Albatross"
 
@@ -249,7 +241,7 @@ class AlbatrossGenerationStateFact(GenerationalStateFact):
 
 state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
     None: LegacyStateFact,
-    AlbatrossGenerationStateFact.generation(): AlbatrossGenerationStateFact,
+    AlbatrossGenerationStateFact.generation: AlbatrossGenerationStateFact,
 }
 """
 This dict holds all the generations of state dicts which were supported by the module.
