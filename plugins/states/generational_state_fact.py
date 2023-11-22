@@ -76,7 +76,7 @@
 
             state_fact_generations: typing.Dict[typing.Optional[str], typing.Type[StateFact]] = {
                 ...,
-                BuboGenerationStateFact.generation: BuboGenerationStateFact,
+                BuboGenerationStateFact.generation(): BuboGenerationStateFact,
             }
 
 """
