@@ -147,7 +147,7 @@ class LegacyStateFact(StateFact):
         return self.state
 
     @classmethod
-    def build_from_state(cls: typing.Type["SF"], state: dict) -> "SF":
+    def build_from_state(cls, state: dict) -> "LegacyStateFact":
         return cls(state=state)
 
     @classmethod
