@@ -144,7 +144,7 @@ class TerraformResourceStateInmanta(TerraformResourceState):
             )  # Make our date timezone-aware
             self._state_fact.config_hash = self.config_hash
 
-        self._param_client.set(self._state_fact.model_dump_json(by_alias=True))
+        self._param_client.set(self._state_fact.json())
 
         self._state = value
 
