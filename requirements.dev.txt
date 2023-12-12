@@ -11,7 +11,7 @@ docker
 # Pin the version of inmanta-core before the Pydantic V2 migration, as our module
 # doesn't work with it (typing wise, we use deprecated functions) but no-one currently
 # needs the module (on iso7 or anywhere else)
-inmanta-core<11.dev
+inmanta-core<12
 
 # This pre-release is broken as reported here: https://github.com/grpc/grpc/issues/30640
 # Also broken here: https://github.com/grpc/grpc/issues/31885
