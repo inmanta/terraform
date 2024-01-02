@@ -183,7 +183,7 @@ def cache_agent_dir(function_temp_dir: str, request: pytest.FixtureRequest) -> s
         fixed_cache_dir = cache_dir.resolve(request.config)
     except ParameterNotSetException:
         LOGGER.warning(
-            "Fixture 'use_agent_cache_dir' was called without setting a cache directory"
+            "Fixture 'cache_agent_dir' was called without setting a cache directory"
         )
         fixed_cache_dir = function_temp_dir
 

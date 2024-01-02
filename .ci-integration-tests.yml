@@ -1,6 +1,7 @@
 pipeline_template: ci/modules/Jenkinsfile-integration-tests
 lock: terraform-module-ci-lab
 env_vars:
+    INMANTA_TERRAFORM_CACHE_DIR: /tmp/terraform-ci-cache-dir
     INMANTA_TERRAFORM_LAB: ci
     INMANTA_TERRAFORM_SKIP_PROVIDER_CHECKPOINT: "true"
     INMANTA_TERRAFORM_SKIP_PROVIDER_FORTIOS: "true"
