@@ -83,7 +83,7 @@ class ProviderInstaller:
             arch = "amd64"
 
         # Get provider available versions
-        response = requests.get(f"{BASE_URL}/{self.namespace}/{self.type}", timeout=3)
+        response = requests.get(f"{BASE_URL}/{self.namespace}/{self.type}", timeout=10)
         response.raise_for_status()
         data = response.json()
         versions = data.get("versions")
@@ -97,7 +97,7 @@ class ProviderInstaller:
         # Get provider specific version info
         response = requests.get(
             f"{BASE_URL}/{self.namespace}/{self.type}/{self.version}/download/{system}/{arch}",
-            timeout=3,
+            timeout=10,
         )
         response.raise_for_status()
         data = response.json()
