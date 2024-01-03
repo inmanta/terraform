@@ -146,7 +146,7 @@ class ProviderInstaller:
             raise InstallerException("The provided download path is a directory")
 
         # Download the file and stream the output to a file, while computing the shasum of it
-        with requests.get(self.download_url, stream=True, timeout=3) as r:
+        with requests.get(self.download_url, stream=True, timeout=10) as r:
             r.raise_for_status()
             sha256_hash = hashlib.sha256()
             with open(str(download_location), "wb") as f:
