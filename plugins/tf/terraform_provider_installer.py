@@ -83,7 +83,7 @@ class ProviderInstaller:
             arch = "amd64"
 
         # Get provider available versions
-        response = requests.get(f"{BASE_URL}/{self.namespace}/{self.type}", timeout=3)
+        response = requests.get(f"{BASE_URL}/{self.namespace}/{self.type}", timeout=10)
         response.raise_for_status()
         data = response.json()
         versions = data.get("versions")
@@ -97,7 +97,7 @@ class ProviderInstaller:
         # Get provider specific version info
         response = requests.get(
             f"{BASE_URL}/{self.namespace}/{self.type}/{self.version}/download/{system}/{arch}",
-            timeout=3,
+            timeout=10,
         )
         response.raise_for_status()
         data = response.json()
@@ -146,7 +146,7 @@ class ProviderInstaller:
             raise InstallerException("The provided download path is a directory")
 
         # Download the file and stream the output to a file, while computing the shasum of it
-        with requests.get(self.download_url, stream=True, timeout=3) as r:
+        with requests.get(self.download_url, stream=True, timeout=10) as r:
             r.raise_for_status()
             sha256_hash = hashlib.sha256()
             with open(str(download_location), "wb") as f:
